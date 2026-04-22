@@ -19,7 +19,8 @@
     ],
     "require": {
         "flarum/core": "^2.0",
-        "intervention/image": "^3.0"
+        "intervention/image": "^3.0",
+        "google/cloud-storage": "^1.30"
     },
     "extra": {
         "flarum-extension": {

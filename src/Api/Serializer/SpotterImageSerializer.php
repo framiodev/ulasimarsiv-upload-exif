@@ -18,6 +18,7 @@ class SpotterImageSerializer extends AbstractSerializer
             'filename'   => $model->filename,
             'url'        => $model->path,       // Tam resim yolu
             'thumb_path' => $model->thumb_path, // Küçük resim yolu
+            'original_path' => $model->original_path ?? null, // Orijinal imzasız resim
             'createdAt'  => $this->formatDate($model->created_at),
         ];
     }

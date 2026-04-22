@@ -20,7 +20,9 @@ class UploadImageController implements RequestHandlerInterface
     protected $settings;
 
     // --- FIREBASE AYARLARI ---
-    const FIREBASE_KEY_PATH = 'D:/Framio Dev/Web Yazılım ve Kodlama/Flarum/Mevcut Forumlar/forum.ulasimarsiv.com/firebase-key.json'; 
+    // Canlı sunucu (Linux) ve yerel için dinamik yol kullanıldı.
+    // firebase-key.json dosyasını forumun ana dizinine (flarum komutunun olduğu yere) koyun.
+    const FIREBASE_KEY_PATH = 'firebase-key.json'; 
     const FIREBASE_BUCKET = 'ulasim-arsiv-forum-storage.firebasestorage.app'; 
     const CUSTOM_DOMAIN = 'https://images.ulasimarsiv.com';
     // -------------------------
@@ -186,7 +188,8 @@ class UploadImageController implements RequestHandlerInterface
             unset($imgWatermarked);
 
             // 8. FIREBASE
-            $storage = new StorageClient(['keyFilePath' => self::FIREBASE_KEY_PATH]);
+            $firebaseKeyAbsolutePath = base_path(self::FIREBASE_KEY_PATH);
+            $storage = new StorageClient(['keyFilePath' => $firebaseKeyAbsolutePath]);
             $bucket = $storage->bucket(self::FIREBASE_BUCKET);
 
             $subDir = date('Y/m');

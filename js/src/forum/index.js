@@ -8,7 +8,7 @@ import GalleryButton from './components/GalleryButton';
 import UserUploadsPage from './components/UserUploadsPage'; // Yeni Sayfa
 import SpotterImageManager from './components/SpotterImageManager';
 
-app.initializers.add('ulasimarsiv-upload-exif', () => {
+app.initializers.add('ulasimarsiv/upload-exif', () => {
   
   // 1. ROTA TANIMLA (/u/kullaniciadi/uploads)
   app.routes['user.uploads'] = { path: '/u/:username/uploads', component: UserUploadsPage };

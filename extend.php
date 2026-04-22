@@ -22,15 +22,15 @@ return [
         ->js(__DIR__.'/js/dist/admin.js'),
 
     (new Extend\Routes('api'))
-        ->post('/spotter-upload', 'spotters.upload', UploadImageController::class)
-        ->get('/ulasimarsiv-image/{id}', 'spotters.show', ShowImageController::class)
+        ->post('/ulasimarsiv-upload', 'ulasimarsiv.upload', UploadImageController::class)
+        ->get('/ulasimarsiv-image/{id}', 'ulasimarsiv.show', ShowImageController::class)
         
         // --- EKLENEN KRİTİK ROTA (Profil Galerisi İçin) ---
-        ->get('/ulasimarsiv-images', 'spotters.images.list', ListImagesController::class)
+        ->get('/ulasimarsiv-images', 'ulasimarsiv.images.list', ListImagesController::class)
         
-        ->get('/ulasimarsiv-images/all', 'spotters.admin.list', ListImagesController::class)
-        ->get('/ulasimarsiv-images/user', 'spotters.user.gallery', UserGalleryController::class)
-        ->delete('/ulasimarsiv-image/{id}', 'spotters.delete', DeleteImageController::class)
+        ->get('/ulasimarsiv-images/all', 'ulasimarsiv.admin.list', ListImagesController::class)
+        ->get('/ulasimarsiv-images/user', 'ulasimarsiv.user.gallery', UserGalleryController::class)
+        ->delete('/ulasimarsiv-image/{id}', 'ulasimarsiv.delete', DeleteImageController::class)
         // YENİ EKLENEN ROTA: Dosya Adı Düzenleme (PATCH)
         ->patch('/ulasimarsiv-image/{id}', 'ulasimarsiv.update', EditImageController::class)
         ->get('/ulasimarsiv-watermarks', 'ulasimarsiv.watermarks', GetWatermarksController::class)
