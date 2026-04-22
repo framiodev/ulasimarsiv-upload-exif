@@ -39,7 +39,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
         <div className="container">
           
           {/* TAB MENÜSÜ */}
-          <div className="SpottersSettings-tabs" style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #ddd', paddingBottom: '10px', flexWrap: 'wrap' }}>
+          <div className="SpottersSettings-tabs" style={{ display: 'flex', gap: '10px', marginTop: '30px', marginBottom: '20px', borderBottom: '1px solid #ddd', paddingBottom: '10px', flexWrap: 'wrap' }}>
             {this.buildTab('general', 'Genel Yapılandırma', 'fas fa-cogs')}
             {this.buildTab('visibility', 'Görünürlük', 'fas fa-eye')}
             {this.buildTab('watermark', 'Filigran Yönetimi', 'fas fa-stamp')}
@@ -101,7 +101,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
             })}
 
             <div className="Form-group" style={{marginTop: '30px', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '5px', border: '1px solid #e8e8e8'}}>
-                <h3 className="Settings-title" style={{color: '#e67e22', marginTop: 0}}>Orijinal (İmzasız) Fotoğraf Ayarları</h3>
+                <h3 className="Settings-title" style={{color: '#800000', marginTop: 0}}>Orijinal (İmzasız) Fotoğraf Ayarları</h3>
                 <p className="helpText">Sadece yöneticilerin görebileceği, imzasız yedeklenen fotoğraflar için geçerlidir. Boş bırakırsanız cihazdaki orijinal haliyle yüklenir.</p>
                 
                 {this.buildSettingComponent({
@@ -150,7 +150,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
   renderWatermarkTab() {
       return (
           <div className="WatermarkManager-section">
-            <h3 className="Settings-title" style={{color: '#27ae60'}}>
+            <h3 className="Settings-title" style={{color: '#800000'}}>
                 <i className="fas fa-stamp" style={{marginRight:'10px'}}></i>
                 Filigran (Watermark) Yönetimi
             </h3>
@@ -247,7 +247,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
               <hr style={{margin: '40px 0'}} />
 
               <div className="MediaManager-section">
-                <h3 className="Settings-title" style={{color: '#e67e22'}}>
+                <h3 className="Settings-title" style={{color: '#800000'}}>
                     <i className="fas fa-archive" style={{marginRight:'10px'}}></i>
                     Orijinal (İmzasız) Medya Deposu
                 </h3>

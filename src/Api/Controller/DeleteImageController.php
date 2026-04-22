@@ -13,10 +13,10 @@ use Google\Cloud\Storage\StorageClient;
 class DeleteImageController extends AbstractDeleteController
 {
     // UploadController ile aynı Firebase ayarlarını kullanıyoruz
-    const FIREBASE_KEY_PATH = '/home/spotters/ulasim-firebase.json'; 
-    const FIREBASE_BUCKET = 'ulasim-info-storage-d312d.firebasestorage.app'; 
+    const FIREBASE_KEY_PATH = 'firebase-key.json'; 
+    const FIREBASE_BUCKET = 'ulasim-arsiv-forum-storage.firebasestorage.app'; 
 
-    protected function delete(ServerRequestInterface $request)
+    protected function delete(ServerRequestInterface $request): void
     {
         $actor = RequestUtil::getActor($request);
         $actor->assertRegistered();
@@ -43,8 +43,8 @@ class DeleteImageController extends AbstractDeleteController
                 $image->original_path = null;
                 $image->save();
             }
-            // İşlem tamam, 204 No Content döndür (AbstractDeleteController delete metodu response dönebilir)
-            return new EmptyResponse(204);
+            // İşlem tamam, AbstractDeleteController void döner
+            return;
         }
 
         // --- SENARYO 2: KOMPLE SİLME (Normal Medya Yöneticisi) ---
@@ -93,7 +93,7 @@ class DeleteImageController extends AbstractDeleteController
                 $objectName = str_replace(self::FIREBASE_BUCKET . '/', '', $path);
             }
 
-            $storage = new StorageClient(['keyFilePath' => self::FIREBASE_KEY_PATH]);
+            $storage = new StorageClient(['keyFilePath' => base_path(self::FIREBASE_KEY_PATH)]);
             $bucket = $storage->bucket(self::FIREBASE_BUCKET);
             $object = $bucket->object($objectName);
             

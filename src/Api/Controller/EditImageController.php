@@ -16,8 +16,8 @@ class EditImageController implements RequestHandlerInterface
 {
     protected $settings;
 
-    const FIREBASE_KEY_PATH = '/home/spotters/ulasim-firebase.json';
-    const FIREBASE_BUCKET = 'ulasim-info-storage-d312d.firebasestorage.app';
+    const FIREBASE_KEY_PATH = 'firebase-key.json';
+    const FIREBASE_BUCKET = 'ulasim-arsiv-forum-storage.firebasestorage.app';
 
     public function __construct(SettingsRepositoryInterface $settings)
     {
@@ -75,7 +75,7 @@ class EditImageController implements RequestHandlerInterface
         $oldOriginalName = $image->original_path ? basename($image->original_path) : null;
 
         // --- FIREBASE İŞLEMLERİ ---
-        $storage = new StorageClient(['keyFilePath' => self::FIREBASE_KEY_PATH]);
+        $storage = new StorageClient(['keyFilePath' => base_path(self::FIREBASE_KEY_PATH)]);
         $bucket = $storage->bucket(self::FIREBASE_BUCKET);
 
         try {
