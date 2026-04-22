@@ -159,7 +159,7 @@ export default class UploadButton extends Component {
     let apiUrl = app.forum.attribute('apiUrl');
     if (window.location.protocol === 'https:' && apiUrl.startsWith('http:')) apiUrl = apiUrl.replace(/^http:/, 'https:');
 
-    return fetch(apiUrl + '/spotter-upload', {
+    return fetch(apiUrl + '/ulasimarsiv-upload', {
         method: 'POST', body: data, headers: { 'X-CSRF-Token': app.session.csrfToken }
     }).then(response => {
         if (!response.ok) return response.text().then(text => { throw new Error(response.status); });

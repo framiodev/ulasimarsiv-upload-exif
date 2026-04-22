@@ -477,7 +477,7 @@ export default class WatermarkModal extends Modal {
 
   loadWatermarks() {
     app.request({
-        method: 'GET', url: app.forum.attribute('apiUrl') + '/spotter-watermarks',
+        method: 'GET', url: app.forum.attribute('apiUrl') + '/ulasimarsiv-watermarks',
     }).then((response) => {
         const list = response.watermarks || [];
         list.forEach(wm => {
