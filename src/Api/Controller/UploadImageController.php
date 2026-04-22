@@ -12,6 +12,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 use Laminas\Diactoros\Response\JsonResponse;
 use UlasimArsiv\UploadExif\Database\SpotterImage;
 use Google\Cloud\Storage\StorageClient;
+use Illuminate\Support\Str;
 use Throwable;
 
 class UploadImageController implements RequestHandlerInterface
@@ -80,18 +81,17 @@ class UploadImageController implements RequestHandlerInterface
                 }
             }
 
-            // --- YENİ: DOSYA ADI BELİRLEME MANTIĞI ---
+            // --- YENİ: DOSYA ADI BELİRLEME VE TEMİZLEME (Boşluk/Türkçe Karakter Sorununa Karşı) ---
             $clientFilename = $file->getClientFilename();
-            $extension = pathinfo($clientFilename, PATHINFO_EXTENSION); // Orijinal uzantıyı al (jpg, png vb.)
+            $extension = pathinfo($clientFilename, PATHINFO_EXTENSION);
 
             if (!empty($customFilenameInput)) {
-                // Kullanıcı özel bir ad girdiyse onu kullan, uzantıyı sonuna ekle
-                // Güvenlik için dosya adındaki yasaklı karakterleri temizleyebiliriz ama
-                // şimdilik trim yeterli, Flarum slug oluştururken halleder.
-                $originalName = trim($customFilenameInput) . '.' . $extension;
+                // Kullanıcı özel bir ad girdiyse, boşluk ve özel karakterleri tireye çevir
+                $originalName = Str::slug(trim($customFilenameInput)) . '.' . $extension;
             } else {
-                // Girmediyse orijinal adı kullan
-                $originalName = $clientFilename;
+                // Orijinal adı da temizle (06 FUH 180.jpg -> 06-fuh-180.jpg)
+                $baseName = pathinfo($clientFilename, PATHINFO_FILENAME);
+                $originalName = Str::slug($baseName) . '.' . $extension;
             }
             // ------------------------------------------
 
