@@ -2,24 +2,22 @@
 namespace UlasimArsiv\UploadExif\Api\Controller;
 
 use Flarum\Http\RequestUtil;
-use Flarum\Api\Controller\AbstractListController;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Tobscure\JsonApi\Document;
+use Psr\Http\Server\RequestHandlerInterface;
+use Laminas\Diactoros\Response\JsonResponse;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Arr;
+use Flarum\User\User;
 
-class ListImagesController extends AbstractListController {
-    // Serializer UlasimArsiv namespace'ine göre ayarlandı
-    public $serializer = 'UlasimArsiv\UploadExif\Api\Serializer\SpotterImageSerializer';
-    public $include = ['user'];
-
+class ListImagesController implements RequestHandlerInterface {
     protected $db;
 
     public function __construct(ConnectionInterface $db) {
         $this->db = $db;
     }
 
-    protected function data(ServerRequestInterface $request, Document $document) {
+    public function handle(ServerRequestInterface $request): ResponseInterface {
         $actor = RequestUtil::getActor($request);
         $filters = $request->getQueryParams()['filter'] ?? [];
         $path = $request->getUri()->getPath(); 
@@ -32,7 +30,7 @@ class ListImagesController extends AbstractListController {
             $query->where(function ($query) use ($q) {
                 // A) Dosya adında ara
                 $query->where('filename', 'like', "%{$q}%")
-                // B) VEYA Kullanıcı adında ara (Alt sorgu ile)
+                // B) VEYA Kullanıcı adında ara
                       ->orWhereIn('user_id', function($subQuery) use ($q) {
                           $subQuery->select('id')
                                    ->from('users')
@@ -42,7 +40,6 @@ class ListImagesController extends AbstractListController {
         }
 
         // --- YENİ EKLENEN KISIM: SADECE ORİJİNALLERİ GETİR ---
-        // Admin panelindeki "Orijinal Medya Deposu" sekmesi için filtre
         if (Arr::get($filters, 'has_original') === '1') {
             $query->whereNotNull('original_path');
         }
@@ -67,31 +64,70 @@ class ListImagesController extends AbstractListController {
         // --- SIRALAMA (Yeniden Eskiye) ---
         $query->orderBy('id', 'desc');
 
-        // --- SAYFALAMA LİMİTİ (Admin Panelinde 14) ---
+        // --- SAYFALAMA LİMİTİ ---
         if (strpos($path, '/all') !== false) {
             $limit = 14; 
         } else {
-            $limit = $this->extractLimit($request);
+            $limit = (int) Arr::get($request->getQueryParams(), 'page.limit', 20);
         }
 
-        $offset = $this->extractOffset($request);
+        $offset = (int) Arr::get($request->getQueryParams(), 'page.offset', 0);
         
         $results = $query->limit($limit)->offset($offset)->get();
 
-        // Kullanıcı verilerini yükle (Misafir yazmaması için)
-        $this->loadUsersForResults($results);
-
-        return $results;
-    }
-
-    protected function loadUsersForResults($results) {
+        // Kullanıcı verilerini yükle
         $userIds = $results->pluck('user_id')->unique();
-        if ($userIds->isEmpty()) return;
+        $users = User::whereIn('id', $userIds)->get()->keyBy('id');
 
-        $users = \Flarum\User\User::whereIn('id', $userIds)->get()->keyBy('id');
+        $data = [];
+        $included = [];
+        $includedIds = [];
 
         foreach ($results as $result) {
-            $result->user = $users->get($result->user_id);
+            $user = $users->get($result->user_id);
+            
+            $item = [
+                'type' => 'ulasimarsiv-images',
+                'id' => (string) $result->id,
+                'attributes' => [
+                    'filename' => $result->filename,
+                    'path' => $result->path,
+                    'thumb_path' => $result->thumb_path,
+                    'exif_data' => $result->exif_data,
+                    'original_path' => $result->original_path,
+                ],
+            ];
+
+            if ($user) {
+                $item['relationships'] = [
+                    'user' => [
+                        'data' => [
+                            'type' => 'users',
+                            'id' => (string) $user->id,
+                        ]
+                    ]
+                ];
+
+                if (!isset($includedIds[$user->id])) {
+                    $includedIds[$user->id] = true;
+                    $included[] = [
+                        'type' => 'users',
+                        'id' => (string) $user->id,
+                        'attributes' => [
+                            'username' => $user->username,
+                            'displayName' => $user->display_name,
+                            'avatarUrl' => $user->avatar_url,
+                        ]
+                    ];
+                }
+            }
+            
+            $data[] = $item;
         }
+
+        return new JsonResponse([
+            'data' => $data,
+            'included' => $included
+        ]);
     }
 }
