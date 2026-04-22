@@ -13,6 +13,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
     this.originals = []; // Sadece orijinaller için liste
     this.isLoading = false;
     this.isLoadingOriginals = false;
+    this.activeTab = 'general'; // Sekme durumu
     
     // SAYFALAMA AYARLARI
     this.offset = 0;
@@ -33,11 +34,45 @@ export default class SpottersSettingsPage extends ExtensionPage {
   }
 
   content() {
-    return [
+    return (
       <div className="SpottersSettingsPage">
         <div className="container">
           
-          {/* --- GENEL AYARLAR --- */}
+          {/* TAB MENÜSÜ */}
+          <div className="SpottersSettings-tabs" style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #ddd', paddingBottom: '10px', flexWrap: 'wrap' }}>
+            {this.buildTab('general', 'Genel Yapılandırma', 'fas fa-cogs')}
+            {this.buildTab('visibility', 'Görünürlük', 'fas fa-eye')}
+            {this.buildTab('watermark', 'Filigran Yönetimi', 'fas fa-stamp')}
+            {this.buildTab('media', 'Medya Yönetimi', 'fas fa-images')}
+          </div>
+
+          <div className="SpottersSettings-content">
+            {this.activeTab === 'general' && this.renderGeneralTab()}
+            {this.activeTab === 'visibility' && this.renderVisibilityTab()}
+            {this.activeTab === 'watermark' && this.renderWatermarkTab()}
+            {this.activeTab === 'media' && this.renderMediaTab()}
+          </div>
+          
+        </div>
+      </div>
+    );
+  }
+
+  buildTab(id, label, icon) {
+      const isActive = this.activeTab === id;
+      return (
+          <Button 
+            className={`Button ${isActive ? 'Button--primary' : 'Button--link'}`} 
+            icon={icon} 
+            onclick={() => { this.activeTab = id; m.redraw(); }}
+          >
+              {label}
+          </Button>
+      );
+  }
+
+  renderGeneralTab() {
+      return (
           <div className="Form-group">
             <h3 className="Settings-title">Genel Yapılandırma</h3>
             {this.buildSettingComponent({
@@ -65,7 +100,6 @@ export default class SpottersSettingsPage extends ExtensionPage {
                 placeholder: '250'
             })}
 
-            {/* --- YENİ EKLENEN BÖLÜM 1: ORİJİNAL (WATERMARKSIZ) FOTOĞRAF AYARLARI --- */}
             <div className="Form-group" style={{marginTop: '30px', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '5px', border: '1px solid #e8e8e8'}}>
                 <h3 className="Settings-title" style={{color: '#e67e22', marginTop: 0}}>Orijinal (İmzasız) Fotoğraf Ayarları</h3>
                 <p className="helpText">Sadece yöneticilerin görebileceği, imzasız yedeklenen fotoğraflar için geçerlidir. Boş bırakırsanız cihazdaki orijinal haliyle yüklenir.</p>
@@ -84,28 +118,37 @@ export default class SpottersSettingsPage extends ExtensionPage {
                 })}
             </div>
 
-            {/* --- YENİ EKLENEN BÖLÜM 2: GÖRÜNÜRLÜK AYARLARI --- */}
-            <div className="Form-group" style={{marginTop: '20px'}}>
-                <h3 className="Settings-title">Görünürlük</h3>
-                {this.buildSettingComponent({
-                    type: 'boolean', 
-                    setting: 'ulasimarsiv-upload-exif.show_exif_publicly', 
-                    label: 'EXIF Bilgilerini Herkese Göster',
-                    help: 'Aktif edilirse ziyaretçiler ve üyeler kamera bilgilerini görebilir. Pasifse sadece admin görür.'
-                })}
-            </div>
-            {/* ------------------------------------------------------------- */}
-
             <div className="Form-group" style={{marginTop: '30px'}}>
                 <Button className="Button Button--primary" onclick={this.save.bind(this)}>
                     Ayarları Kaydet
                 </Button>
             </div>
           </div>
+      );
+  }
 
-          <hr style={{margin: '40px 0'}} />
+  renderVisibilityTab() {
+      return (
+          <div className="Form-group">
+              <h3 className="Settings-title">Görünürlük</h3>
+              {this.buildSettingComponent({
+                  type: 'boolean', 
+                  setting: 'ulasimarsiv-upload-exif.show_exif_publicly', 
+                  label: 'EXIF Bilgilerini Herkese Göster',
+                  help: 'Aktif edilirse ziyaretçiler ve üyeler kamera bilgilerini görebilir. Pasifse sadece admin görür.'
+              })}
 
-          {/* --- ADMIN WATERMARK YÖNETİMİ (YENİ) --- */}
+              <div className="Form-group" style={{marginTop: '30px'}}>
+                  <Button className="Button Button--primary" onclick={this.save.bind(this)}>
+                      Ayarları Kaydet
+                  </Button>
+              </div>
+          </div>
+      );
+  }
+
+  renderWatermarkTab() {
+      return (
           <div className="WatermarkManager-section">
             <h3 className="Settings-title" style={{color: '#27ae60'}}>
                 <i className="fas fa-stamp" style={{marginRight:'10px'}}></i>
@@ -171,54 +214,50 @@ export default class SpottersSettingsPage extends ExtensionPage {
             
             {this.adminWatermarks.length === 0 && <div style={{padding: '20px', textAlign: 'center', color: '#999'}}>Henüz özel imza klasörü bulunmuyor.</div>}
           </div>
+      );
+  }
 
-          <hr style={{margin: '40px 0'}} />
-
-          {/* --- BÖLÜM 3: TÜM MEDYA YÖNETİMİ (MEVCUT) --- */}
-          <div className="MediaManager-section" style={{marginTop: '30px'}}>
-            
-            <div className="MediaManager-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
-                <h3 className="Settings-title" style={{margin: 0}}>Tüm Medya Yönetimi</h3>
-                
-                <div className="MediaManager-search" style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
-                    <input 
-                        className="FormControl" 
-                        type="text" 
-                        placeholder="Dosya adı veya kullanıcı adı ile ara..." 
-                        value={this.searchQuery}
-                        oninput={e => this.searchQuery = e.target.value}
-                        onkeydown={e => { if (e.key === 'Enter') this.performSearch(); }}
-                        style={{width: '300px'}} 
-                    />
-                    <Button className="Button Button--primary" onclick={this.performSearch.bind(this)}>
-                        <i className="fas fa-search"></i>
-                    </Button>
+  renderMediaTab() {
+      return (
+          <div>
+              <div className="MediaManager-section">
+                <div className="MediaManager-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+                    <h3 className="Settings-title" style={{margin: 0}}>Tüm Medya Yönetimi</h3>
+                    
+                    <div className="MediaManager-search" style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
+                        <input 
+                            className="FormControl" 
+                            type="text" 
+                            placeholder="Dosya adı veya kullanıcı adı ile ara..." 
+                            value={this.searchQuery}
+                            oninput={e => this.searchQuery = e.target.value}
+                            onkeydown={e => { if (e.key === 'Enter') this.performSearch(); }}
+                            style={{width: '300px'}} 
+                        />
+                        <Button className="Button Button--primary" onclick={this.performSearch.bind(this)}>
+                            <i className="fas fa-search"></i>
+                        </Button>
+                    </div>
                 </div>
-            </div>
 
-            {/* MEVCUT GRID RENDER (Ortak Fonksiyon Kullanıyoruz) */}
-            {this.renderGrid(this.images, this.isLoading, false)}
-            {this.renderPagination(this.images.length, false)}
+                {this.renderGrid(this.images, this.isLoading, false)}
+                {this.renderPagination(this.images.length, false)}
+              </div>
 
+              <hr style={{margin: '40px 0'}} />
+
+              <div className="MediaManager-section">
+                <h3 className="Settings-title" style={{color: '#e67e22'}}>
+                    <i className="fas fa-archive" style={{marginRight:'10px'}}></i>
+                    Orijinal (İmzasız) Medya Deposu
+                </h3>
+                <p className="helpText">Burada sadece "Orijinal" yedeği bulunan fotoğraflar listelenir. "Yedeği Sil" derseniz, forumdaki fotoğraf (imzalı) kalır, sadece yedek silinerek yer açılır.</p>
+                
+                {this.renderGrid(this.originals, this.isLoadingOriginals, true)}
+                {this.renderPagination(this.originals.length, true)}
+              </div>
           </div>
-
-          <hr style={{margin: '40px 0'}} />
-
-          {/* --- BÖLÜM 4: ORİJİNAL (YEDEKLENMİŞ) MEDYA YÖNETİMİ (YENİ) --- */}
-          <div className="MediaManager-section">
-            <h3 className="Settings-title" style={{color: '#e67e22'}}>
-                <i className="fas fa-archive" style={{marginRight:'10px'}}></i>
-                Orijinal (İmzasız) Medya Deposu
-            </h3>
-            <p className="helpText">Burada sadece "Orijinal" yedeği bulunan fotoğraflar listelenir. "Yedeği Sil" derseniz, forumdaki fotoğraf (imzalı) kalır, sadece yedek silinerek yer açılır.</p>
-            
-            {this.renderGrid(this.originals, this.isLoadingOriginals, true)}
-            {this.renderPagination(this.originals.length, true)}
-          </div>
-
-        </div>
-      </div>
-    ];
+      );
   }
 
   // --- ORTAK RENDER FONKSİYONLARI ---
