@@ -2,12 +2,12 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\TemplateNormalizations;
 
-use DOMElement;
+use s9e\SweetDOM\Element;
 
 /**
 * Remove unnecessary <xsl:if> tests around <xsl:value-of>
@@ -19,12 +19,12 @@ class OptimizeConditionalValueOf extends AbstractNormalization
 	/**
 	* {@inheritdoc}
 	*/
-	protected $queries = ['//xsl:if[count(descendant::node()) = 1]/xsl:value-of'];
+	protected array $queries = ['//xsl:if[count(descendant::node()) = 1]/xsl:value-of'];
 
 	/**
 	* {@inheritdoc}
 	*/
-	protected function normalizeElement(DOMElement $element)
+	protected function normalizeElement(Element $element): void
 	{
 		$if     = $element->parentNode;
 		$test   = $if->getAttribute('test');
@@ -37,6 +37,6 @@ class OptimizeConditionalValueOf extends AbstractNormalization
 		}
 
 		// Replace the xsl:if element with the xsl:value-of element
-		$if->parentNode->replaceChild($if->removeChild($element), $if);
+		$if->replaceWith($element);
 	}
 }

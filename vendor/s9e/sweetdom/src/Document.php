@@ -11,244 +11,138 @@ use DOMDocument;
 use DOMNode;
 use DOMNodeList;
 use DOMXPath;
-use const ENT_XML1;
-use function call_user_func_array, func_get_args, htmlspecialchars;
+use RuntimeException;
+use const PHP_VERSION;
+use function func_get_args, method_exists, libxml_get_last_error, trim, version_compare;
 
+/**
+* @method Attr|false createAttribute(string $localName)
+* @method Attr|false createAttributeNS(?string $namespace, string $qualifiedName)
+* @method CdataSection|false createCDATASection(string $data)
+* @method Comment createComment(string $data)
+* @method DocumentFragment createDocumentFragment()
+* @method Element|false createElement(string $localName, string $value = '')
+* @method Element|false createElementNS(?string $namespace, string $qualifiedName, string $value = '')
+* @method Text createTextNode(string $data)
+* @method ?Element getElementById(string $elementId)
+* @property ?DocumentType $doctype
+* @property ?Element $documentElement
+* @property ?Element $firstElementChild
+* @property ?Element $lastElementChild
+* @property ?Document $ownerDocument
+* @property ?Element $parentElement
+*/
 class Document extends DOMDocument
 {
+	public NodeCreator $nodeCreator;
+
 	/**
 	* @link https://www.php.net/manual/domdocument.construct.php
-	*
-	* @param string $version  Version number of the document
-	* @param string $encoding Encoding of the document
 	*/
-	public function __construct(string $version = '1.0', string $encoding = 'utf-8')
+	public function __construct(string $version = '1.0', string $encoding = '')
 	{
 		parent::__construct($version, $encoding);
 
-		$this->registerNodeClass('DOMElement', Element::class);
-	}
-
-	/**
-	* Create and return an xsl:apply-templates element
-	*
-	* @param  string  $select XPath expression for the "select" attribute
-	* @return Element
-	*/
-	public function createXslApplyTemplates(string $select = null): Element
-	{
-		$element = $this->createElementXSL('apply-templates');
-		if (isset($select))
+		$this->nodeCreator = new NodeCreator($this);
+		foreach ($this->getExtendedClassMap() as $baseClass => $extendedClass)
 		{
-			$element->setAttribute('select', $select);
+			$this->registerNodeClass($baseClass, $extendedClass);
 		}
-
-		return $element;
-	}
-
-	/**
-	* Create and return an xsl:attribute element
-	*
-	* @param  string  $name Attribute's name
-	* @param  string  $text Text content for the element
-	* @return Element
-	*/
-	public function createXslAttribute(string $name, string $text = ''): Element
-	{
-		$element = $this->createElementXSL('attribute', $text);
-		$element->setAttribute('name', $name);
-
-		return $element;
-	}
-
-	/**
-	* Create and return an xsl:choose element
-	*
-	* @return Element
-	*/
-	public function createXslChoose(): Element
-	{
-		return $this->createElementXSL('choose');
-	}
-
-	/**
-	* Create and return an xsl:comment element
-	*
-	* @param  string  $text Text content for the comment
-	* @return Element
-	*/
-	public function createXslComment(string $text = ''): Element
-	{
-		return $this->createElementXSL('comment', $text);
-	}
-
-	/**
-	* Create and return an xsl:copy-of element
-	*
-	* @param  string  $select XPath expression for the "select" attribute
-	* @return Element
-	*/
-	public function createXslCopyOf(string $select): Element
-	{
-		$element = $this->createElementXSL('copy-of');
-		$element->setAttribute('select', $select);
-
-		return $element;
-	}
-
-	/**
-	* Create and return an xsl:if element
-	*
-	* @param  string  $test XPath expression for the "test" attribute
-	* @param  string  $text Text content for the element
-	* @return Element
-	*/
-	public function createXslIf(string $test, string $text = ''): Element
-	{
-		$element = $this->createElementXSL('if', $text);
-		$element->setAttribute('test', $test);
-
-		return $element;
-	}
-
-	/**
-	* Create and return an xsl:otherwise element
-	*
-	* @param  string  $text Text content for the element
-	* @return Element
-	*/
-	public function createXslOtherwise(string $text = ''): Element
-	{
-		return $this->createElementXSL('otherwise', $text);
-	}
-
-	/**
-	* Create and return an xsl:text element
-	*
-	* @param  string  $text Text content for the element
-	* @return Element
-	*/
-	public function createXslText(string $text = ''): Element
-	{
-		return $this->createElementXSL('text', $text);
-	}
-
-	/**
-	* Create and return an xsl:value-of element
-	*
-	* @param  string  $select XPath expression for the "select" attribute
-	* @return Element
-	*/
-	public function createXslValueOf(string $select): Element
-	{
-		$element = $this->createElementXSL('value-of');
-		$element->setAttribute('select', $select);
-
-		return $element;
-	}
-
-	/**
-	* Create and return an xsl:variable element
-	*
-	* @param  string  $name   Name of the variable
-	* @param  string  $select XPath expression
-	* @return Element
-	*/
-	public function createXslVariable(string $name, string $select = null): Element
-	{
-		$element = $this->createElementXSL('variable');
-		$element->setAttribute('name', $name);
-		if (isset($select))
-		{
-			$element->setAttribute('select', $select);
-		}
-
-		return $element;
-	}
-
-	/**
-	* Create and return an xsl:when element
-	*
-	* @param  string  $test XPath expression for the "test" attribute
-	* @param  string  $text Text content for the element
-	* @return Element
-	*/
-	public function createXslWhen(string $test, string $text = ''): Element
-	{
-		$element = $this->createElementXSL('when', $text);
-		$element->setAttribute('test', $test);
-
-		return $element;
 	}
 
 	/**
 	* Evaluate and return the result of a given XPath expression
-	*
-	* @param  string  $expr           XPath expression
-	* @param  DOMNode $node           Context node
-	* @param  bool    $registerNodeNS Whether to register the node's namespace
-	* @return mixed
 	*/
-	public function evaluate(string $expr, DOMNode $node = null, bool $registerNodeNS = true)
+	public function evaluate(string $expression, ?DOMNode $contextNode = null, bool $registerNodeNS = true): mixed
 	{
 		return $this->xpath('evaluate', func_get_args());
 	}
 
 	/**
 	* Evaluate and return the first element of a given XPath query
-	*
-	* @param  string      $expr           XPath expression
-	* @param  DOMNode     $node           Context node
-	* @param  bool        $registerNodeNS Whether to register the node's namespace
-	* @return DOMNode|null
 	*/
-	public function firstOf(string $expr, DOMNode $node = null, bool $registerNodeNS = true): ?DOMNode
+	public function firstOf(string $expression, ?DOMNode $contextNode = null, bool $registerNodeNS = true): ?DOMNode
 	{
-		return $this->xpath('query', func_get_args())->item(0);
+		return $this->query(...func_get_args())->item(0);
+	}
+
+	public function isEqualNode(?DOMNode $otherNode): bool
+	{
+		return method_exists('DOMDocument', 'isEqualNode')
+		     ? parent::isEqualNode($otherNode)
+		     : NodeComparator::isEqualNode($this, $otherNode);
 	}
 
 	/**
 	* Evaluate and return the result of a given XPath query
-	*
-	* @param  string      $expr           XPath expression
-	* @param  DOMNode     $node           Context node
-	* @param  bool        $registerNodeNS Whether to register the node's namespace
-	* @return DOMNodeList
 	*/
-	public function query(string $expr, DOMNode $node = null, bool $registerNodeNS = true): DOMNodeList
+	public function query(string $expression, ?DOMNode $contextNode = null, bool $registerNodeNS = true): DOMNodeList
 	{
-		return $this->xpath('query', func_get_args());
+		$result = $this->xpath('query', func_get_args());
+		if ($result === false)
+		{
+			$errorMessage = libxml_get_last_error()?->message ?? 'No error message';
+
+			throw new RuntimeException('Invalid XPath query: ' . trim($errorMessage));
+		}
+
+		return $result;
 	}
 
-	/**
-	* Create and return an XSL element
-	*
-	* @param  string  $name Element's local name
-	* @param  string  $text Text content for the element
-	* @return Element
-	*/
-	protected function createElementXSL(string $localName, string $text = ''): Element
+	protected function getExtendedClassMap(): array
 	{
-		return $this->createElementNS(
-			'http://www.w3.org/1999/XSL/Transform',
-			'xsl:' . $localName,
-			htmlspecialchars($text, ENT_XML1)
-		);
+		$baseNames = ['Attr', 'CdataSection', 'Comment', 'DocumentFragment', 'Element', 'Text'];
+		$classMap  = [];
+		$namespace = $this->getExtendedNamespace(PHP_VERSION);
+		foreach ($baseNames as $baseName)
+		{
+			$classMap['DOM' . $baseName] = $namespace . '\\' . $baseName;
+		}
+
+		return $classMap;
+	}
+
+	protected function getExtendedNamespace(string $phpVersion): string
+	{
+		$namespace = __NAMESPACE__;
+		if ($this->needsWorkarounds($phpVersion))
+		{
+			$namespace .= '\\PatchedNodes';
+		}
+		elseif (version_compare($phpVersion, '8.3.0', '<'))
+		{
+			$namespace .= '\\ForwardCompatibleNodes';
+		}
+
+		return $namespace;
+	}
+
+	protected function needsWorkarounds(string $phpVersion): bool
+	{
+		if (version_compare($phpVersion, '8.2.10', '>='))
+		{
+			// PHP ^8.2.10 needs no workarounds
+			return false;
+		}
+		if (version_compare($phpVersion, '8.1.23', '<'))
+		{
+			// Anything older than 8.1.23 does
+			return true;
+		}
+
+		// ~8.1.23 is okay, anything between 8.2.0 and 8.2.9 needs workarounds
+		return version_compare($phpVersion, '8.2.0-dev', '>=');
 	}
 
 	/**
 	* Execute a DOMXPath method and return the result
-	*
-	* @param  string $methodName
-	* @param  array  $args
-	* @return mixed
 	*/
-	protected function xpath(string $methodName, array $args)
+	protected function xpath(string $methodName, array $args): mixed
 	{
 		$xpath = new DOMXPath($this);
 		$xpath->registerNamespace('xsl', 'http://www.w3.org/1999/XSL/Transform');
 		$xpath->registerNodeNamespaces = true;
 
-		return call_user_func_array([$xpath, $methodName], $args);
+		return $xpath->$methodName(...$args);
 	}
 }

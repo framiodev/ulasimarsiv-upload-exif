@@ -7,6 +7,7 @@ import Button from './Button';
 
 import BasicEditorDriver from '../utils/BasicEditorDriver';
 import Tooltip from './Tooltip';
+import LoadingIndicator from './LoadingIndicator';
 
 /**
  * The `TextEditor` component displays a textarea with controls, including a
@@ -20,6 +21,7 @@ import Tooltip from './Tooltip';
  * - `placeholder`
  * - `disabled`
  * - `preview`
+ * - `onTextEditorBuilt`
  */
 export default class TextEditor extends Component {
   oninit(vnode) {
@@ -36,17 +38,33 @@ export default class TextEditor extends Component {
      * Whether the editor is disabled.
      */
     this.disabled = !!this.attrs.disabled;
+
+    /**
+     * Whether the editor is loading.
+     */
+    this.loading = true;
+
+    /**
+     * Async operations to complete before the editor is ready.
+     */
+    this._loaders = [];
   }
 
   view() {
     return (
       <div className="TextEditor">
-        <div className="TextEditor-editorContainer"></div>
+        {this.loading ? (
+          <LoadingIndicator />
+        ) : (
+          <>
+            <div className="TextEditor-editorContainer"></div>
 
-        <ul className="TextEditor-controls Composer-footer">
-          {listItems(this.controlItems().toArray())}
-          <li className="TextEditor-toolbar">{this.toolbarItems().toArray()}</li>
-        </ul>
+            <ul className="TextEditor-controls Composer-footer">
+              {listItems(this.controlItems().toArray())}
+              <li className="TextEditor-toolbar">{this.toolbarItems().toArray()}</li>
+            </ul>
+          </>
+        )}
       </div>
     );
   }
@@ -54,7 +72,14 @@ export default class TextEditor extends Component {
   oncreate(vnode) {
     super.oncreate(vnode);
 
+    this._load().then(() => {
+      setTimeout(this.onbuild.bind(this), 50);
+    });
+  }
+
+  onbuild() {
     this.attrs.composer.editor = this.buildEditor(this.$('.TextEditor-editorContainer')[0]);
+    this.attrs.onTextEditorBuilt?.();
   }
 
   onupdate(vnode) {
@@ -66,6 +91,13 @@ export default class TextEditor extends Component {
       this.disabled = newDisabled;
       this.attrs.composer.editor.disabled(newDisabled);
     }
+  }
+
+  _load() {
+    return Promise.all(this._loaders.map((loader) => loader())).then(() => {
+      this.loading = false;
+      m.redraw();
+    });
   }
 
   buildEditorParams() {

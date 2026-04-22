@@ -2,9 +2,8 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title><?php echo $title; ?></title>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
       @import url(//fonts.googleapis.com/css?family=Open+Sans:400italic,700italic,400,700,600);
@@ -15,7 +14,7 @@
         padding: 0;
         line-height: 1.5;
       }
-      body, input, button {
+      body, .FormControl, button {
         font-family: 'Open Sans', sans-serif;
         font-size: 16px;
         color: #7E96B3;
@@ -50,15 +49,19 @@
       .FormGroup {
         margin-bottom: 20px;
       }
-      .FormGroup .FormField:first-child input {
+      .FormGroup .FormField:first-child .FormControl {
         border-top-left-radius: 4px;
         border-top-right-radius: 4px;
       }
-      .FormGroup .FormField:last-child input {
+      .FormGroup .FormField:last-child .FormControl {
         border-bottom-left-radius: 4px;
         border-bottom-right-radius: 4px;
       }
-      .FormField input {
+      .FormField select.FormControl {
+          -webkit-appearance: none;
+          -moz-appearance: none;
+      }
+      .FormField .FormControl {
         background: #EDF2F7;
         margin: 0 0 1px;
         border: 2px solid transparent;
@@ -67,7 +70,7 @@
         padding: 15px 15px 15px 180px;
         box-sizing: border-box;
       }
-      .FormField input:focus {
+      .FormField .FormControl:focus {
         border-color: #e7652e;
         background: #fff;
         color: #444;
@@ -104,6 +107,17 @@
         padding: 15px 20px;
         border-radius: 4px;
         margin-bottom: 20px;
+      }
+
+      .Alert {
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+      }
+
+      .Alert--warning {
+        background: #fff2ae;
+        color: #ad6c00;
       }
 
       .animated {

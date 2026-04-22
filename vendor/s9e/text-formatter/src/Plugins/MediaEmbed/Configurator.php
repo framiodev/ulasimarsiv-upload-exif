@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Plugins\MediaEmbed;
@@ -15,6 +15,7 @@ use s9e\TextFormatter\Configurator\Items\Tag;
 use s9e\TextFormatter\Configurator\JavaScript\Dictionary;
 use s9e\TextFormatter\Plugins\ConfiguratorBase;
 use s9e\TextFormatter\Plugins\MediaEmbed\Configurator\Collections\CachedDefinitionCollection;
+use s9e\TextFormatter\Plugins\MediaEmbed\Configurator\SiteHelpers\AbstractSiteHelper;
 use s9e\TextFormatter\Plugins\MediaEmbed\Configurator\TemplateBuilder;
 
 class Configurator extends ConfiguratorBase
@@ -22,7 +23,7 @@ class Configurator extends ConfiguratorBase
 	/**
 	* @var array List of filters that are explicitly allowed in attribute definitions
 	*/
-	public $allowedFilters = ['htmlspecialchars_decode', 'stripslashes', 'urldecode'];
+	public $allowedFilters = ['htmlspecialchars_decode', 'stripslashes', 'str_replace', 'urldecode'];
 
 	/**
 	* @var bool Whether to create the MEDIA BBCode
@@ -104,7 +105,7 @@ class Configurator extends ConfiguratorBase
 	* @param  array  $siteConfig Site's config
 	* @return Tag                Tag created for this site
 	*/
-	public function add($siteId, array $siteConfig = null)
+	public function add($siteId, ?array $siteConfig = null)
 	{
 		// Normalize or retrieve the site definition
 		$siteId = $this->normalizeId($siteId);
@@ -134,6 +135,13 @@ class Configurator extends ConfiguratorBase
 		$this->configurator->registeredVars['MediaEmbed.sites'][$siteId] = [$siteConfig['extract'], $siteConfig['scrape']];
 
 		return $tag;
+	}
+
+	public function getSiteHelper(string $siteId): AbstractSiteHelper
+	{
+		$className = $this->defaultSites->get($siteId)['helper'];
+
+		return new $className($this->configurator);
 	}
 
 	/**
@@ -217,7 +225,7 @@ class Configurator extends ConfiguratorBase
 	*/
 	protected function convertRegexps(array $regexps)
 	{
-		return array_map([$this, 'convertRegexp'], $regexps);
+		return array_map($this->convertRegexp(...), $regexps);
 	}
 
 	/**
@@ -242,7 +250,7 @@ class Configurator extends ConfiguratorBase
 	*/
 	protected function convertScrapes(array $scrapes)
 	{
-		return array_map([$this, 'convertScrapeConfig'], $scrapes);
+		return array_map($this->convertScrapeConfig(...), $scrapes);
 	}
 
 	/**

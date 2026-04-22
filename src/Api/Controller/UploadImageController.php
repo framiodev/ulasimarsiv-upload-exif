@@ -1,6 +1,6 @@
 <?php
 
-namespace UlasimInfo\UploadExif\Api\Controller;
+namespace UlasimArsiv\UploadExif\Api\Controller;
 
 use Flarum\User\User;
 use Flarum\Http\RequestUtil;
@@ -10,7 +10,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Laminas\Diactoros\Response\JsonResponse;
-use UlasimInfo\UploadExif\Database\SpotterImage;
+use UlasimArsiv\UploadExif\Database\SpotterImage;
 use Google\Cloud\Storage\StorageClient;
 use Throwable;
 
@@ -20,8 +20,9 @@ class UploadImageController implements RequestHandlerInterface
     protected $settings;
 
     // --- FIREBASE AYARLARI ---
-    const FIREBASE_KEY_PATH = '/home/ulasimin/ulasim-firebase.json'; 
-    const FIREBASE_BUCKET = 'ulasim-info-storage-d312d.firebasestorage.app'; 
+    const FIREBASE_KEY_PATH = 'D:/Framio Dev/Web Yazılım ve Kodlama/Flarum/Mevcut Forumlar/forum.ulasimarsiv.com/firebase-key.json'; 
+    const FIREBASE_BUCKET = 'ulasim-arsiv-forum-storage.firebasestorage.app'; 
+    const CUSTOM_DOMAIN = 'https://images.ulasimarsiv.com';
     // -------------------------
 
     public function __construct(SettingsRepositoryInterface $settings)
@@ -34,17 +35,17 @@ class UploadImageController implements RequestHandlerInterface
     {
         try {
             // 1. AYARLAR
-            $settingWidth = $this->settings->get('ulasiminfo-upload-exif.resize_width');
+            $settingWidth = $this->settings->get('ulasimarsiv-upload-exif.resize_width');
             $maxWidth = (is_numeric($settingWidth) && (int)$settingWidth > 0) ? (int)$settingWidth : 3840;
 
-            $settingThumb = $this->settings->get('ulasiminfo-upload-exif.thumb_width');
+            $settingThumb = $this->settings->get('ulasimarsiv-upload-exif.thumb_width');
             $thumbWidth = (is_numeric($settingThumb) && (int)$settingThumb > 0) ? (int)$settingThumb : 1024;
 
-            $settingMini = $this->settings->get('ulasiminfo-upload-exif.mini_width');
+            $settingMini = $this->settings->get('ulasimarsiv-upload-exif.mini_width');
             $miniWidth = (is_numeric($settingMini) && (int)$settingMini > 0) ? (int)$settingMini : 250;
 
-            $origResize = $this->settings->get('ulasiminfo-upload-exif.original_resize_width');
-            $origQuality = $this->settings->get('ulasiminfo-upload-exif.original_compression_quality'); 
+            $origResize = $this->settings->get('ulasimarsiv-upload-exif.original_resize_width');
+            $origQuality = $this->settings->get('ulasimarsiv-upload-exif.original_compression_quality'); 
 
             @ini_set('memory_limit', '512M');
             @ini_set('max_execution_time', 300);
@@ -113,23 +114,23 @@ class UploadImageController implements RequestHandlerInterface
             }
 
             // 6. İŞLEME
-            $driver = extension_loaded('imagick') ? 'imagick' : 'gd';
-            $manager = new ImageManager(['driver' => $driver]);
+            $driverObj = extension_loaded('imagick') ? new \Intervention\Image\Drivers\Imagick\Driver() : new \Intervention\Image\Drivers\Gd\Driver();
+            $manager = new ImageManager($driverObj);
 
             // Yedek İşleme
             if (($origResize && (int)$origResize > 0) || ($origQuality && (int)$origQuality < 100)) {
-                $imgOrig = $manager->make($tempBackupPath);
+                $imgOrig = $manager->read($tempBackupPath);
                 if ($origResize) {
-                    $imgOrig->resize($origResize, null, function ($c) { $c->aspectRatio(); $c->upsize(); });
+                    $imgOrig->scaleDown(width: $origResize);
                 }
                 $q = $origQuality ? (int)$origQuality : 100;
-                $imgOrig->save($tempBackupPath, $q);
-                $imgOrig->destroy();
+                $imgOrig->save($tempBackupPath, quality: $q);
+                unset($imgOrig);
             }
 
             // Ana Dosya İşleme
-            $imgWatermarked = $manager->make($localFullPath);
-            $imgWatermarked->resize($maxWidth, null, function ($c) { $c->aspectRatio(); $c->upsize(); });
+            $imgWatermarked = $manager->read($localFullPath);
+            $imgWatermarked->scaleDown(width: $maxWidth);
 
             // Watermark
             $shouldApplyWatermark = ($watermarkFilename !== 'none' && !empty($watermarkFilename)) || ($actor->isAdmin() && !empty($targetUsername));
@@ -147,51 +148,50 @@ class UploadImageController implements RequestHandlerInterface
                 } 
                 elseif ($watermarkFilename !== 'none') {
                     $userWmPath = $baseWmDir . '/' . $actor->username . '/' . $watermarkFilename;
-                    $defaultWmPath = $baseWmDir . '/ulasiminfo/' . $watermarkFilename;
+                    $defaultWmPath = $baseWmDir . '/ulasimarsiv/' . $watermarkFilename;
                     if (file_exists($userWmPath)) $validWmPath = $userWmPath;
                     elseif (file_exists($defaultWmPath)) $validWmPath = $defaultWmPath;
                 }
 
                 if ($validWmPath) {
-                    $wm = $manager->make($validWmPath);
+                    $wm = $manager->read($validWmPath);
                     
-                    // --- FULL WIDTH WATERMARK (Önceki Revize) ---
+                    // --- FULL WIDTH WATERMARK ---
                     $targetWidth = $imgWatermarked->width();
-                    $wm->resize($targetWidth, null, function ($c) { $c->aspectRatio(); });
-                    $imgWatermarked->insert($wm, 'bottom'); // En alta tam genişlikte bas
-                    // --------------------------------------------
+                    $wm->scaleDown(width: $targetWidth);
+                    $imgWatermarked->place($wm, 'bottom'); // En alta bas
                     
-                    $wm->destroy();
+                    unset($wm);
                 }
             }
 
-            $imgWatermarked->save($localFullPath, 90); 
+            $imgWatermarked->save($localFullPath, quality: 90); 
             $this->transferExifData($tempBackupPath, $localFullPath);
 
             // 7. THUMBNAIL / MINI
             $imgThumb = clone $imgWatermarked; 
-            $imgThumb->resize($thumbWidth, null, function ($c) { $c->aspectRatio(); $c->upsize(); });
+            $imgThumb->scaleDown(width: $thumbWidth);
             $thumbName = 'thumb_' . $safeName;
             $localThumbPath = "$this->uploadPath/$thumbName";
-            $imgThumb->save($localThumbPath, 80);
-            $imgThumb->destroy();
+            $imgThumb->save($localThumbPath, quality: 80);
+            unset($imgThumb);
 
             $imgMini = clone $imgWatermarked; 
-            $imgMini->resize($miniWidth, null, function ($c) { $c->aspectRatio(); $c->upsize(); });
+            $imgMini->scaleDown(width: $miniWidth);
             $miniName = 'mini_' . $safeName;
             $localMiniPath = "$this->uploadPath/$miniName";
-            $imgMini->save($localMiniPath, 70);
-            $imgMini->destroy();
+            $imgMini->save($localMiniPath, quality: 70);
+            unset($imgMini);
             
-            $imgWatermarked->destroy();
+            unset($imgWatermarked);
 
             // 8. FIREBASE
             $storage = new StorageClient(['keyFilePath' => self::FIREBASE_KEY_PATH]);
             $bucket = $storage->bucket(self::FIREBASE_BUCKET);
 
             $subDir = date('Y/m');
-            $cloudFolder = 'assets/spotters/' . $subDir . '/';
-            $firebaseBaseUrl = 'https://storage.googleapis.com/' . self::FIREBASE_BUCKET;
+            $cloudFolder = 'assets/ulasimarsiv/' . $subDir . '/';
+            $firebaseBaseUrl = self::CUSTOM_DOMAIN;
 
             $bucket->upload(fopen($localFullPath, 'r'), ['name' => $cloudFolder . $safeName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg']]);
             $finalMainUrl = $firebaseBaseUrl . '/' . $cloudFolder . $safeName;
@@ -231,7 +231,7 @@ class UploadImageController implements RequestHandlerInterface
 
             $pathInfo = pathinfo($originalName);
             $altText = str_replace(['-', '_'], ' ', $pathInfo['filename']);
-            $bbcode = "[spotter-image id={$imageModel->id} url=\"{$imageModel->thumb_path}\" alt=\"{$altText}\"]";
+            $bbcode = "[ulasimarsiv-image id={$imageModel->id} url=\"{$imageModel->thumb_path}\" alt=\"{$altText}\"]";
 
             return new JsonResponse([
                 'id' => $imageModel->id,

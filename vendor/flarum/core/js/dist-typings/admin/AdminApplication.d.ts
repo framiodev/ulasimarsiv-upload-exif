@@ -1,14 +1,18 @@
 import { AdminRoutes } from './routes';
 import Application, { ApplicationData } from '../common/Application';
-import ExtensionData from './utils/ExtensionData';
+import AdminRegistry from './utils/AdminRegistry';
 import IHistory from '../common/IHistory';
-export type Extension = {
+import SearchManager from '../common/SearchManager';
+import SearchState from '../common/states/SearchState';
+import GeneralSearchIndex from './states/GeneralSearchIndex';
+export interface Extension {
     id: string;
     name: string;
     version: string;
     description?: string;
     icon?: {
         name: string;
+        [key: string]: string;
     };
     links: {
         authors?: {
@@ -25,30 +29,65 @@ export type Extension = {
     extra: {
         'flarum-extension': {
             title: string;
+            category?: string;
+            'database-support'?: string[];
         };
     };
+    require?: Record<string, string>;
+    suggest?: Record<string, string>;
     abandoned?: boolean | string;
-};
+}
+export declare enum DatabaseDriver {
+    MySQL = "MySQL",
+    PostgreSQL = "PostgreSQL",
+    SQLite = "SQLite"
+}
 export interface AdminApplicationData extends ApplicationData {
     extensions: Record<string, Extension>;
+    installedPackages: string[];
     settings: Record<string, string>;
     modelStatistics: Record<string, {
         total: number;
     }>;
     displayNameDrivers: string[];
+    avatarDrivers: string[];
     slugDrivers: Record<string, string[]>;
+    searchDrivers: Record<string, string[]>;
     permissions: Record<string, string[]>;
+    maintenanceByConfig: boolean;
+    safeModeExtensions?: string[] | null;
+    safeModeExtensionsConfig?: string[] | null;
     announcementsDisabled: boolean;
+    fontawesomeByConfig: boolean;
+    fontawesomeConfig?: {
+        source: string;
+        cdn_url: string | null;
+        kit_url: string | null;
+    };
+    dbDriver: DatabaseDriver;
+    dbVersion: string;
+    dbOptions: Record<string, string>;
+    phpVersion: string;
+    queueDriver: string;
+    schedulerStatus: string;
+    sessionDriver: string;
 }
 export default class AdminApplication extends Application {
-    extensionData: ExtensionData;
-    extensionCategories: {
-        feature: number;
-        theme: number;
-        'forum-widget': number;
-        language: number;
-    };
+    /**
+     * Stores the available settings, permissions, and custom pages of the app.
+     * Allows the global search to find these items.
+     *
+     * @internal
+     */
+    registry: AdminRegistry;
+    extensionCategories: Record<string, number>;
     history: IHistory;
+    search: SearchManager<SearchState>;
+    /**
+     * Custom settings and custom permissions do not go through the registry.
+     * The general index is used to manually add these items to be picked up by the search.
+     */
+    generalIndex: GeneralSearchIndex;
     /**
      * Settings are serialized to the admin dashboard as strings.
      * Additional encoding/decoding is possible, but must take
@@ -59,6 +98,7 @@ export default class AdminApplication extends Application {
     data: AdminApplicationData;
     route: typeof Application.prototype.route & AdminRoutes;
     constructor();
+    protected runBeforeMount(): void;
     /**
      * @inheritdoc
      */

@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\TemplateNormalizations;
@@ -53,7 +53,7 @@ class FoldConstantXPathExpressions extends AbstractConstantFolding
 	protected function evaluate($expr)
 	{
 		$useErrors = libxml_use_internal_errors(true);
-		$result    = $this->xpath->evaluate($expr);
+		$result    = $this->ownerDocument->evaluate($expr);
 		libxml_use_internal_errors($useErrors);
 
 		return $result;

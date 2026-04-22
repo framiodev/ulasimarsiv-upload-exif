@@ -12,33 +12,28 @@ namespace Flarum\Foundation\ErrorHandling;
 use Flarum\Api\JsonApiResponse;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use Tobscure\JsonApi\Document;
 
 /**
  * A formatter to render exceptions as valid {JSON:API} error object.
  *
  * See https://jsonapi.org/format/1.0/#errors.
  */
-class JsonApiFormatter implements HttpFormatter
+readonly class JsonApiFormatter implements HttpFormatter
 {
-    private $includeTrace;
-
-    public function __construct($includeTrace = false)
-    {
-        $this->includeTrace = $includeTrace;
+    public function __construct(
+        private bool $includeTrace = false
+    ) {
     }
 
     public function format(HandledError $error, Request $request): Response
     {
-        $document = new Document;
-
         if ($error->hasDetails()) {
-            $document->setErrors($this->withDetails($error));
+            $errors = $this->withDetails($error);
         } else {
-            $document->setErrors($this->default($error));
+            $errors = $this->default($error);
         }
 
-        return new JsonApiResponse($document, $error->getStatusCode());
+        return new JsonApiResponse(compact('errors'), $error->getStatusCode());
     }
 
     private function default(HandledError $error): array

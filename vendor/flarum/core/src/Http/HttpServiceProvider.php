@@ -16,6 +16,7 @@ use Flarum\Foundation\AbstractServiceProvider;
 use Flarum\Http\Access\ScopeAccessTokenVisibility;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\IdSlugDriver;
+use Flarum\User\IdWithDisplayNameSlugDriver;
 use Flarum\User\User;
 use Flarum\User\UsernameSlugDriver;
 use Illuminate\Contracts\Container\Container;
@@ -23,13 +24,10 @@ use Illuminate\Support\Arr;
 
 class HttpServiceProvider extends AbstractServiceProvider
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function register()
+    public function register(): void
     {
         $this->container->singleton('flarum.http.csrfExemptPaths', function () {
-            return ['token'];
+            return ['token', 'registration-token'];
         });
 
         $this->container->bind(Middleware\CheckCsrfToken::class, function (Container $container) {
@@ -44,7 +42,8 @@ class HttpServiceProvider extends AbstractServiceProvider
                 ],
                 User::class => [
                     'default' => UsernameSlugDriver::class,
-                    'id' => IdSlugDriver::class
+                    'id' => IdSlugDriver::class,
+                    'id_with_display_name' => IdWithDisplayNameSlugDriver::class,
                 ],
             ];
         });
@@ -64,22 +63,20 @@ class HttpServiceProvider extends AbstractServiceProvider
 
             return $compiledDrivers;
         });
+
         $this->container->bind(SlugManager::class, function (Container $container) {
             return new SlugManager($container->make('flarum.http.selectedSlugDrivers'));
         });
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function boot()
+    public function boot(): void
     {
         $this->setAccessTokenTypes();
 
         AccessToken::registerVisibilityScoper(new ScopeAccessTokenVisibility(), 'view');
     }
 
-    protected function setAccessTokenTypes()
+    protected function setAccessTokenTypes(): void
     {
         $models = [
             DeveloperAccessToken::class,

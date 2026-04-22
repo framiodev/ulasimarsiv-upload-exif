@@ -11,6 +11,7 @@ import type Post from './components/Post';
 import type Discussion from '../common/models/Discussion';
 import type NotificationModel from '../common/models/Notification';
 import type PostModel from '../common/models/Post';
+import SearchManager from '../common/SearchManager';
 export interface ForumApplicationData extends ApplicationData {
 }
 export default class ForumApplication extends Application {
@@ -44,10 +45,9 @@ export default class ForumApplication extends Application {
      */
     notifications: NotificationListState;
     /**
-     * An object which stores previously searched queries and provides convenient
-     * tools for retrieving and managing search values.
+     * An object which stores the global search state and manages search capabilities.
      */
-    search: GlobalSearchState;
+    search: SearchManager<GlobalSearchState>;
     /**
      * An object which controls the state of the composer.
      */
@@ -68,13 +68,4 @@ export default class ForumApplication extends Application {
      * Check whether or not the user is currently viewing a discussion.
      */
     viewingDiscussion(discussion: Discussion): boolean;
-    /**
-     * Callback for when an external authenticator (social login) action has
-     * completed.
-     *
-     * If the payload indicates that the user has been logged in, then the page
-     * will be reloaded. Otherwise, a SignUpModal will be opened, prefilled
-     * with the provided details.
-     */
-    authenticationComplete(payload: Record<string, unknown>): void;
 }

@@ -23,32 +23,20 @@ use Symfony\Component\Console\Output\StreamOutput;
 
 class UpdateController implements RequestHandlerInterface
 {
-    protected $command;
-
-    /**
-     * @var Config
-     */
-    protected $config;
-
-    /**
-     * @param MigrateCommand $command
-     * @param Config $config
-     */
-    public function __construct(MigrateCommand $command, Config $config)
-    {
-        $this->command = $command;
-        $this->config = $config;
+    public function __construct(
+        protected MigrateCommand $command,
+        protected Config $config
+    ) {
     }
 
-    /**
-     * @param Request $request
-     * @return ResponseInterface
-     */
     public function handle(Request $request): ResponseInterface
     {
         $input = $request->getParsedBody();
 
-        if (Arr::get($input, 'databasePassword') !== $this->config['database.password']) {
+        if (
+            $this->databaseHasPassword()
+            && Arr::get($input, 'databasePassword') !== $this->config['database.password']
+        ) {
             return new HtmlResponse('Incorrect database password.', 500);
         }
 
@@ -63,5 +51,10 @@ class UpdateController implements RequestHandlerInterface
         }
 
         return new Response($body, 200);
+    }
+
+    private function databaseHasPassword(): bool
+    {
+        return $this->config['database.password'] !== null;
     }
 }

@@ -1,6 +1,11 @@
 import { FlarumRequestOptions } from './Application';
 import Model, { ModelData, SavedModelData } from './Model';
 export interface MetaInformation {
+    page?: {
+        limit?: number;
+        offset?: number;
+        total?: number;
+    };
     [key: string]: any;
 }
 export interface ApiQueryParamsSingle {
@@ -14,7 +19,7 @@ export interface ApiQueryParamsPlural {
     include?: string;
     filter?: {
         q: string;
-    } | Record<string, string>;
+    } | Record<string, any>;
     page?: {
         near?: number;
         offset?: number;
@@ -39,7 +44,11 @@ export interface ApiPayloadPlural {
         next?: string;
         prev?: string;
     };
-    meta?: MetaInformation;
+    meta?: MetaInformation & {
+        total?: number;
+        page?: number;
+        perPage?: number;
+    };
 }
 export type ApiPayload = ApiPayloadSingle | ApiPayloadPlural;
 export type ApiResponseSingle<M extends Model> = M & {
@@ -92,7 +101,6 @@ export default class Store {
      *     registered for this resource type.
      */
     pushObject<M extends Model>(data: SavedModelData): M | null;
-    pushObject<M extends Model>(data: SavedModelData, allowUnregistered: false): M;
     /**
      * Make a request to the API to find record(s) of a specific type.
      */

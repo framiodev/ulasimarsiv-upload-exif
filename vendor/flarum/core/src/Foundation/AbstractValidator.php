@@ -9,64 +9,43 @@
 
 namespace Flarum\Foundation;
 
-use Illuminate\Contracts\Cache\Store as Cache;
-use Illuminate\Support\Arr;
+use Flarum\Locale\TranslatorInterface;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Factory;
 use Illuminate\Validation\ValidationException;
-use Symfony\Contracts\Translation\TranslatorInterface;
+use Illuminate\Validation\Validator;
 
 abstract class AbstractValidator
 {
-    use ExtensionIdTrait;
-
     /**
-     * @deprecated This constant is no longer used internally and will be removed in a future release.
-     *             Use dynamic cache keys based on class and locale instead.
-     * @var string
+     * @var callable[]
      */
-    public static $CORE_VALIDATION_CACHE_KEY = 'core.validation.extension_id_class_names';
+    protected array $configuration = [];
 
-    /**
-     * @var array
-     */
-    protected $configuration = [];
+    protected array $rules = [];
 
-    public function addConfiguration($callable)
+    protected ?Validator $laravelValidator = null;
+
+    protected bool $validateMissingKeys = false;
+
+    public function __construct(
+        protected Factory $validator,
+        protected TranslatorInterface $translator
+    ) {
+    }
+
+    public function addConfiguration(callable $callable): void
     {
         $this->configuration[] = $callable;
     }
 
     /**
-     * @var array
-     */
-    protected $rules = [];
-
-    /**
-     * @var Factory
-     */
-    protected $validator;
-
-    /**
-     * @var TranslatorInterface
-     */
-    protected $translator;
-
-    /**
-     * @param Factory $validator
-     * @param TranslatorInterface $translator
-     */
-    public function __construct(Factory $validator, TranslatorInterface $translator)
-    {
-        $this->validator = $validator;
-        $this->translator = $translator;
-    }
-
-    /**
      * Throw an exception if a model is not valid.
      *
-     * @param array $attributes
+     * @throws ValidationException
      */
-    public function assertValid(array $attributes)
+    public function assertValid(array $attributes): void
     {
         $validator = $this->makeValidator($attributes);
 
@@ -76,59 +55,63 @@ abstract class AbstractValidator
     }
 
     /**
-     * @return array
+     * Whether to validate missing keys or to only validate provided data keys.
      */
-    protected function getRules()
+    public function validateMissingKeys(bool $validateMissingKeys = true): static
+    {
+        $this->validateMissingKeys = $validateMissingKeys;
+
+        return $this;
+    }
+
+    public function prepare(array $attributes): static
+    {
+        $this->laravelValidator ??= $this->makeValidator($attributes);
+
+        return $this;
+    }
+
+    public function validator(): Validator
+    {
+        return $this->laravelValidator;
+    }
+
+    protected function getRules(): array
     {
         return $this->rules;
     }
 
-    /**
-     * @return array
-     */
-    protected function getMessages()
+    protected function getActiveRules(array $attributes): array
+    {
+        $rules = $this->getRules();
+
+        if ($this->validateMissingKeys) {
+            return $rules;
+        }
+
+        return Collection::make($rules)
+            ->filter(function (mixed $rule, string $key) use ($attributes) {
+                foreach ($attributes as $attributeKey => $attributeValue) {
+                    if ($attributeKey === $key || Str::startsWith($key, $attributeKey.'.')) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })
+            ->all();
+    }
+
+    protected function getMessages(): array
     {
         return [];
     }
 
-    /**
-     * @return array
-     */
-    protected function getAttributeNames()
+    protected function makeValidator(array $attributes): Validator
     {
-        $cache = resolve(Cache::class);
-
-        $cacheKey = 'core.validation.attributes.'.$this->translator->getLocale().'.'.static::class;
-
-        if ($cached = $cache->get($cacheKey)) {
-            return $cached;
-        }
-
-        $extId = $this->getClassExtensionId();
-        $attributeNames = [];
-
-        foreach (array_keys($this->getRules()) as $attribute) {
-            $key = $extId ? "$extId.validation.attributes.$attribute" : "validation.attributes.$attribute";
-            $attributeNames[$attribute] = $this->translator->trans($key);
-        }
-
-        $cache->forever($cacheKey, $attributeNames);
-
-        return $attributeNames;
-    }
-
-    /**
-     * Make a new validator instance for this model.
-     *
-     * @param array $attributes
-     * @return \Illuminate\Validation\Validator
-     */
-    protected function makeValidator(array $attributes)
-    {
-        $rules = Arr::only($this->getRules(), array_keys($attributes));
+        $rules = $this->getActiveRules($attributes);
 
         $validator = $this->validator->make($attributes, $rules, $this->getMessages());
-        $validator->setAttributeNames($this->getAttributeNames());
 
         foreach ($this->configuration as $callable) {
             $callable($this, $validator);

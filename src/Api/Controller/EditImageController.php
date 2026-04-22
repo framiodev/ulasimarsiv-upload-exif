@@ -1,6 +1,6 @@
 <?php
 
-namespace UlasimInfo\UploadExif\Api\Controller;
+namespace UlasimArsiv\UploadExif\Api\Controller;
 
 use Flarum\Http\RequestUtil;
 use Flarum\Post\Post;
@@ -9,7 +9,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Laminas\Diactoros\Response\JsonResponse;
-use UlasimInfo\UploadExif\Database\SpotterImage;
+use UlasimArsiv\UploadExif\Database\SpotterImage;
 use Google\Cloud\Storage\StorageClient;
 
 class EditImageController implements RequestHandlerInterface
@@ -103,12 +103,12 @@ class EditImageController implements RequestHandlerInterface
             $newThumbPath = $baseUrl . $newThumbName;
 
             // --- BBCODE GÜNCELLEME ---
-            $posts = Post::where('content', 'like', '%[spotter-image id=' . $image->id . '%')->get();
+            $posts = Post::where('content', 'like', '%[ulasimarsiv-image id=' . $image->id . '%')->get();
             
             foreach ($posts as $post) {
                 // Regex ile eski url ve alt text'i bulup yenisiyle değiştir
-                $pattern = '/\[spotter-image id=' . $image->id . ' url="([^"]+)" alt="([^"]+)"\]/';
-                $replacement = '[spotter-image id=' . $image->id . ' url="' . $newThumbPath . '" alt="' . $safeName . '"]';
+                $pattern = '/\[ulasimarsiv-image id=' . $image->id . ' url="([^"]+)" alt="([^"]+)"\]/';
+                $replacement = '[ulasimarsiv-image id=' . $image->id . ' url="' . $newThumbPath . '" alt="' . $safeName . '"]';
                 
                 $newContent = preg_replace($pattern, $replacement, $post->content);
                 

@@ -2,8 +2,9 @@ import app from '../../forum/app';
 import ComposerBody from './ComposerBody';
 import Button from '../../common/components/Button';
 import Link from '../../common/components/Link';
-import icon from '../../common/helpers/icon';
 import extractText from '../../common/utils/extractText';
+import Icon from '../../common/components/Icon';
+import haptic from '../../common/utils/haptic';
 
 function minimizeComposerIfFullScreen(e) {
   if (app.composer.isFullScreen()) {
@@ -37,7 +38,7 @@ export default class ReplyComposer extends ComposerBody {
     items.add(
       'title',
       <h3>
-        {icon('fas fa-reply')}{' '}
+        <Icon name={'fas fa-reply'} />{' '}
         <Link href={app.route.discussion(discussion)} onclick={minimizeComposerIfFullScreen}>
           {discussion.title()}
         </Link>
@@ -71,6 +72,7 @@ export default class ReplyComposer extends ComposerBody {
   onsubmit() {
     const discussion = this.attrs.discussion;
 
+    haptic('success');
     this.loading = true;
     m.redraw();
 

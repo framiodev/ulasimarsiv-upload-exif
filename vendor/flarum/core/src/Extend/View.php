@@ -22,8 +22,8 @@ use Illuminate\View\Factory as FactoryImplementation;
  */
 class View implements ExtenderInterface, LifecycleInterface
 {
-    private $namespaces = [];
-    private $prependNamespaces = [];
+    private array $namespaces = [];
+    private array $prependNamespaces = [];
 
     /**
      * Register a new namespace of Laravel views.
@@ -37,9 +37,8 @@ class View implements ExtenderInterface, LifecycleInterface
      * @param  string  $namespace: The name of the namespace.
      * @param  string|string[]  $hints: This is a path (or an array of paths) to the folder(s)
      *                               where view files are stored, relative to the extend.php file.
-     * @return self
      */
-    public function namespace(string $namespace, $hints): self
+    public function namespace(string $namespace, array|string $hints): self
     {
         $this->namespaces[$namespace] = $hints;
 
@@ -54,17 +53,16 @@ class View implements ExtenderInterface, LifecycleInterface
      *
      * @param  string  $namespace: The name of the namespace.
      * @param  string|string[]  $hints: This is a path (or an array of paths) to the folder(s)
-     *                               where view files are stored, relative to the extend.php file.
-     * @return self
+     *                               where view files are stored, relative to the `extend.php` file.
      */
-    public function extendNamespace(string $namespace, $hints): self
+    public function extendNamespace(string $namespace, array|string $hints): self
     {
         $this->prependNamespaces[$namespace] = $hints;
 
         return $this;
     }
 
-    public function extend(Container $container, Extension $extension = null)
+    public function extend(Container $container, ?Extension $extension = null): void
     {
         $container->resolving(Factory::class, function (FactoryImplementation $view) {
             foreach ($this->namespaces as $namespace => $hints) {
@@ -77,22 +75,18 @@ class View implements ExtenderInterface, LifecycleInterface
     }
 
     /**
-     * @param Container $container
-     * @param Extension $extension
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function onEnable(Container $container, Extension $extension)
+    public function onEnable(Container $container, Extension $extension): void
     {
         $storagePath = $container->make(Paths::class)->storage;
         array_map('unlink', glob($storagePath.'/views/*'));
     }
 
     /**
-     * @param Container $container
-     * @param Extension $extension
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function onDisable(Container $container, Extension $extension)
+    public function onDisable(Container $container, Extension $extension): void
     {
         $storagePath = $container->make(Paths::class)->storage;
         array_map('unlink', glob($storagePath.'/views/*'));

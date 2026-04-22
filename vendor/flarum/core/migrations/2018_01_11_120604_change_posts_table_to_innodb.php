@@ -7,18 +7,25 @@
  * LICENSE file that was distributed with this source code.
  */
 
+use Illuminate\Database\MySqlConnection;
 use Illuminate\Database\Schema\Builder;
 
 return [
     'up' => function (Builder $schema) {
         $connection = $schema->getConnection();
-        $prefix = $connection->getTablePrefix();
-        $connection->statement('ALTER TABLE '.$prefix.'posts ENGINE = InnoDB');
+
+        if ($connection->getDriverName() instanceof MySqlConnection) {
+            $prefix = $connection->getTablePrefix();
+            $connection->statement('ALTER TABLE '.$prefix.'posts ENGINE = InnoDB');
+        }
     },
 
     'down' => function (Builder $schema) {
         $connection = $schema->getConnection();
-        $prefix = $connection->getTablePrefix();
-        $connection->statement('ALTER TABLE '.$prefix.'posts ENGINE = MyISAM');
+
+        if ($connection->getDriverName() instanceof MySqlConnection) {
+            $prefix = $connection->getTablePrefix();
+            $connection->statement('ALTER TABLE '.$prefix.'posts ENGINE = MyISAM');
+        }
     }
 ];

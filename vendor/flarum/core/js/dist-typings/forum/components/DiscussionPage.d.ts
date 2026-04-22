@@ -13,6 +13,9 @@ export interface IDiscussionPageAttrs extends IPageAttrs {
  * the discussion list pane, the hero, the posts, and the sidebar.
  */
 export default class DiscussionPage<CustomAttrs extends IDiscussionPageAttrs = IDiscussionPageAttrs> extends Page<CustomAttrs> {
+    protected loading: boolean;
+    protected PostStream: any;
+    protected PostStreamScrubber: any;
     /**
      * The discussion that is being viewed.
      */
@@ -28,12 +31,7 @@ export default class DiscussionPage<CustomAttrs extends IDiscussionPageAttrs = I
     protected useBrowserScrollRestoration: boolean;
     oninit(vnode: Mithril.Vnode<CustomAttrs, this>): void;
     onremove(vnode: Mithril.VnodeDOM<CustomAttrs, this>): void;
-    view(): Mithril.Children;
-    viewItems(): ItemList<Mithril.Children>;
-    /**
-     * List of components shown while the discussion is loading.
-     */
-    loadingItems(): ItemList<Mithril.Children>;
+    view(): JSX.Element;
     /**
      * Function that renders the `sidebarItems` ItemList.
      */
@@ -42,14 +40,6 @@ export default class DiscussionPage<CustomAttrs extends IDiscussionPageAttrs = I
      * Renders the discussion's hero.
      */
     hero(): Mithril.Children;
-    /**
-     * List of items rendered as the main page content.
-     */
-    pageContent(): ItemList<Mithril.Children>;
-    /**
-     * List of items rendered inside the main page content container.
-     */
-    mainContent(): ItemList<Mithril.Children>;
     /**
      * Load the discussion from the API or use the preloaded one.
      */
@@ -70,6 +60,12 @@ export default class DiscussionPage<CustomAttrs extends IDiscussionPageAttrs = I
     /**
      * When the posts that are visible in the post stream change (i.e. the user
      * scrolls up or down), then we update the URL and mark the posts as read.
+     *
+     * URL and history writes are skipped when startNumber hasn't changed from the
+     * last known position — this prevents double history churn from the immediate
+     * post-scroll emit and the subsequent settle-end reconciliation both resolving
+     * to the same post. Read-state saves are intentionally independent of this
+     * guard and use their own endNumber condition.
      */
     positionChanged(startNumber: number, endNumber: number): void;
 }

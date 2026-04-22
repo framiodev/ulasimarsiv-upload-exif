@@ -5,11 +5,10 @@ import ItemList from '../../common/utils/ItemList';
 import classList from '../../common/utils/classList';
 import extractText from '../../common/utils/extractText';
 import KeyboardNavigatable from '../../common/utils/KeyboardNavigatable';
-import icon from '../../common/helpers/icon';
-import SearchState from '../states/SearchState';
+import Icon from '../../common/components/Icon';
+import SearchState from '../../common/states/SearchState';
 import DiscussionsSearchSource from './DiscussionsSearchSource';
 import UsersSearchSource from './UsersSearchSource';
-import { fireDeprecationWarning } from '../../common/helpers/fireDebugWarning';
 import type Mithril from 'mithril';
 
 /**
@@ -42,6 +41,10 @@ export interface SearchAttrs extends ComponentAttrs {
 }
 
 /**
+ * @todo: 2.0 refactored the global search UI and no longer uses this component, now we use the GlobalSearch component.
+ *        The component was kept to support extension usage of it on a local scope.
+ *        We need to extract this component into a separate UI package instead as it is no longer needed by core.
+ *
  * The `Search` component displays a menu of as-you-type results from a variety
  * of sources.
  *
@@ -60,32 +63,9 @@ export default class Search<T extends SearchAttrs = SearchAttrs> extends Compone
   protected static MIN_SEARCH_LEN = 3;
 
   /**
-   * Time to wait (in milliseconds) after the user stops typing before triggering a search.
-   */
-  protected static SEARCH_DEBOUNCE_TIME_MS = 250;
-
-  /**
    * The instance of `SearchState` for this component.
    */
   protected searchState!: SearchState;
-
-  /**
-   * The instance of `SearchState` for this component.
-   *
-   * @deprecated Replace with`this.searchState` instead.
-   */
-  // TODO: [Flarum 2.0] Remove this.
-  // @ts-expect-error This is a get accessor, while superclass defines this as a property. This is needed to prevent breaking changes, however.
-  get state() {
-    fireDeprecationWarning('`state` property of the Search component is deprecated', '3212');
-    return this.searchState;
-  }
-  set state(state: SearchState) {
-    // Workaround to prevent triggering deprecation warnings due to Mithril
-    // setting state to undefined when creating components
-    state !== undefined && fireDeprecationWarning('`state` property of the Search component is deprecated', '3212');
-    this.searchState = state;
-  }
 
   /**
    * Whether or not the search input has focus.
@@ -165,10 +145,10 @@ export default class Search<T extends SearchAttrs = SearchAttrs> extends Compone
             <button
               className="Search-clear Button Button--icon Button--link"
               onclick={this.clear.bind(this)}
-              aria-label={app.translator.trans('core.forum.header.search_clear_button_accessible_label')}
+              aria-label={app.translator.trans('core.lib.search.search_clear_button_accessible_label')}
               type="button"
             >
-              {icon('fas fa-times-circle')}
+              <Icon name="fas fa-times-circle" />
             </button>
           )}
         </div>
@@ -263,7 +243,7 @@ export default class Search<T extends SearchAttrs = SearchAttrs> extends Compone
 
           state.cache(query);
           m.redraw();
-        }, (search.constructor as typeof Search).SEARCH_DEBOUNCE_TIME_MS);
+        }, 250);
       })
 
       .on('focus', function () {

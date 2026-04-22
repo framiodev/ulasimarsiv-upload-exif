@@ -18,19 +18,19 @@ use Illuminate\Contracts\Events\Dispatcher;
 
 class DiscussionMetadataUpdater
 {
-    public function subscribe(Dispatcher $events)
+    public function subscribe(Dispatcher $events): void
     {
-        $events->listen(Posted::class, [$this, 'whenPostWasPosted']);
-        $events->listen(Deleted::class, [$this, 'whenPostWasDeleted']);
-        $events->listen(Hidden::class, [$this, 'whenPostWasHidden']);
-        $events->listen(Restored::class, [$this, 'whenPostWasRestored']);
+        $events->listen(Posted::class, $this->whenPostWasPosted(...));
+        $events->listen(Deleted::class, $this->whenPostWasDeleted(...));
+        $events->listen(Hidden::class, $this->whenPostWasHidden(...));
+        $events->listen(Restored::class, $this->whenPostWasRestored(...));
     }
 
-    public function whenPostWasPosted(Posted $event)
+    public function whenPostWasPosted(Posted $event): void
     {
         $discussion = $event->post->discussion;
 
-        if ($discussion && $discussion->exists) {
+        if ($discussion?->exists) {
             $discussion->refreshCommentCount();
             $discussion->refreshLastPost();
             $discussion->refreshParticipantCount();
@@ -38,7 +38,7 @@ class DiscussionMetadataUpdater
         }
     }
 
-    public function whenPostWasDeleted(Deleted $event)
+    public function whenPostWasDeleted(Deleted $event): void
     {
         $this->removePost($event->post);
 
@@ -49,16 +49,16 @@ class DiscussionMetadataUpdater
         }
     }
 
-    public function whenPostWasHidden(Hidden $event)
+    public function whenPostWasHidden(Hidden $event): void
     {
         $this->removePost($event->post);
     }
 
-    public function whenPostWasRestored(Restored $event)
+    public function whenPostWasRestored(Restored $event): void
     {
         $discussion = $event->post->discussion;
 
-        if ($discussion && $discussion->exists) {
+        if ($discussion?->exists) {
             $discussion->refreshCommentCount();
             $discussion->refreshParticipantCount();
             $discussion->refreshLastPost();
@@ -66,11 +66,11 @@ class DiscussionMetadataUpdater
         }
     }
 
-    protected function removePost(Post $post)
+    protected function removePost(Post $post): void
     {
         $discussion = $post->discussion;
 
-        if ($discussion && $discussion->exists) {
+        if ($discussion?->exists) {
             $discussion->refreshCommentCount();
             $discussion->refreshParticipantCount();
 

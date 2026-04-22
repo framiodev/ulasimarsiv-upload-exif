@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Renderers;
@@ -63,9 +63,12 @@ abstract class PHP extends Renderer
 	*/
 	abstract protected function renderNode(DOMNode $node);
 
-	public function __sleep()
+	public function __serialize(): array
 	{
-		return ['enableQuickRenderer', 'params'];
+		return [
+			'enableQuickRenderer' => $this->enableQuickRenderer,
+			'params'              => $this->params
+		];
 	}
 
 	/**
@@ -198,7 +201,7 @@ abstract class PHP extends Renderer
 		$xml = $this->decodeSMP($xml);
 		$html = preg_replace_callback(
 			$this->quickRegexp,
-			[$this, 'renderQuickCallback'],
+			$this->renderQuickCallback(...),
 			substr($xml, 1 + strpos($xml, '>'), -4)
 		);
 

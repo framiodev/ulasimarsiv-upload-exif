@@ -1,13 +1,13 @@
 <?php
 
-namespace UlasimInfo\UploadExif\Api\Controller;
+namespace UlasimArsiv\UploadExif\Api\Controller;
 
 use Flarum\Http\RequestUtil;
 use Psr\Http\Message\ServerRequestInterface;
 use Laminas\Diactoros\Response\JsonResponse;
 use Psr\Http\Server\RequestHandlerInterface;
 use Psr\Http\Message\ResponseInterface;
-use UlasimInfo\UploadExif\Database\SpotterImage;
+use UlasimArsiv\UploadExif\Database\SpotterImage;
 use Illuminate\Support\Arr;
 
 class ShowImageController implements RequestHandlerInterface

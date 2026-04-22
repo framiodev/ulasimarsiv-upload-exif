@@ -12,32 +12,44 @@ namespace Flarum\Mail;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Illuminate\Contracts\Validation\Factory;
 use Illuminate\Support\MessageBag;
-use Swift_SmtpTransport;
-use Swift_Transport;
+use Symfony\Component\Mailer\Transport\Dsn;
+use Symfony\Component\Mailer\Transport\TransportFactoryInterface;
+use Symfony\Component\Mailer\Transport\TransportInterface;
 
 class SmtpDriver implements DriverInterface
 {
     use ValidatesMailSettings;
+
+    public function __construct(
+        protected TransportFactoryInterface $factory
+    ) {
+    }
 
     public function availableSettings(): array
     {
         return [
             'mail_host' => '', // a hostname, IPv4 address or IPv6 wrapped in []
             'mail_port' => '', // a number, defaults to 25
-            'mail_encryption' => '', // "tls" or "ssl"
+            'mail_encryption' => [ // Dropdown options for encryption
+                '' => 'None',
+                'tls' => 'TLS',
+                'ssl' => 'SSL',
+            ],
             'mail_username' => '',
             'mail_password' => '',
+            'mail_smtp_verify_peer' => true, // boolean toggle
         ];
     }
 
     public function validate(SettingsRepositoryInterface $settings, Factory $validator): MessageBag
     {
         return $validator->make($settings->all(), [
-            'mail_host' => ['required', $this->noWhitespace()],
-            'mail_port' => ['nullable', 'integer', $this->noWhitespace()],
+            'mail_host' => ['required', $this->noWhiteSpace()],
+            'mail_port' => ['nullable', 'integer', $this->noWhiteSpace()],
             'mail_encryption' => 'nullable|in:tls,ssl,TLS,SSL',
-            'mail_username' => ['nullable', 'string', $this->noWhitespace()],
-            'mail_password' => ['nullable', 'string', $this->noWhitespace()],
+            'mail_username' => ['nullable', 'string', $this->noWhiteSpace()],
+            'mail_password' => ['nullable', 'string', $this->noWhiteSpace()],
+            'mail_smtp_verify_peer' => 'nullable|boolean',
         ])->errors();
     }
 
@@ -46,17 +58,35 @@ class SmtpDriver implements DriverInterface
         return true;
     }
 
-    public function buildTransport(SettingsRepositoryInterface $settings): Swift_Transport
+    public function buildTransport(SettingsRepositoryInterface $settings): TransportInterface
     {
-        $transport = new Swift_SmtpTransport(
+        $encryption = strtolower((string) $settings->get('mail_encryption'));
+
+        // 'ssl' means implicit TLS/SSL (smtps://), typically used with port 465
+        // 'tls' or empty means STARTTLS (smtp://), typically used with port 587 or 25
+        $scheme = ($encryption === 'ssl') ? 'smtps' : 'smtp';
+
+        $options = [];
+
+        // When no encryption is selected, disable opportunistic STARTTLS so that
+        // the connection stays plaintext rather than silently upgrading.
+        if ($encryption === '') {
+            $options['auto_tls'] = 'false';
+        }
+
+        // Allow administrators to disable SSL certificate verification, e.g.
+        // when using a self-signed certificate on an internal mail server.
+        if ((string) $settings->get('mail_smtp_verify_peer') === '0') {
+            $options['verify_peer'] = 'false';
+        }
+
+        return $this->factory->create(new Dsn(
+            $scheme,
             $settings->get('mail_host'),
+            $settings->get('mail_username'),
+            $settings->get('mail_password'),
             $settings->get('mail_port'),
-            $settings->get('mail_encryption')
-        );
-
-        $transport->setUsername($settings->get('mail_username'));
-        $transport->setPassword($settings->get('mail_password'));
-
-        return $transport;
+            $options
+        ));
     }
 }

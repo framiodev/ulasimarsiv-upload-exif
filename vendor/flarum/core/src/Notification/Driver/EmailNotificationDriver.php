@@ -16,21 +16,13 @@ use Flarum\User\User;
 use Illuminate\Contracts\Queue\Queue;
 use ReflectionClass;
 
-class EmailNotificationDriver implements NotificationDriverInterface
+readonly class EmailNotificationDriver implements NotificationDriverInterface
 {
-    /**
-     * @var Queue
-     */
-    private $queue;
-
-    public function __construct(Queue $queue)
-    {
-        $this->queue = $queue;
+    public function __construct(
+        private Queue $queue
+    ) {
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function send(BlueprintInterface $blueprint, array $users): void
     {
         if ($blueprint instanceof MailableInterface) {
@@ -41,10 +33,9 @@ class EmailNotificationDriver implements NotificationDriverInterface
     /**
      * Mail a notification to a list of users.
      *
-     * @param MailableInterface&BlueprintInterface $blueprint
      * @param User[] $recipients
      */
-    protected function mailNotifications(MailableInterface $blueprint, array $recipients)
+    protected function mailNotifications(MailableInterface&BlueprintInterface $blueprint, array $recipients): void
     {
         foreach ($recipients as $user) {
             if ($user->shouldEmail($blueprint::getType())) {
@@ -53,15 +44,12 @@ class EmailNotificationDriver implements NotificationDriverInterface
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function registerType(string $blueprintClass, array $driversEnabledByDefault): void
     {
         if ((new ReflectionClass($blueprintClass))->implementsInterface(MailableInterface::class)) {
             User::registerPreference(
                 User::getNotificationPreferenceKey($blueprintClass::getType(), 'email'),
-                'boolval',
+                boolval(...),
                 in_array('email', $driversEnabledByDefault)
             );
         }

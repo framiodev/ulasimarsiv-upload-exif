@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Plugins\HTMLElements;
@@ -156,7 +156,7 @@ class Configurator extends ConfiguratorBase
 		$elName  = $this->normalizeElementName($elName);
 		$tagName = $this->prefix . ':' . $elName;
 
-		if (!$allowUnsafe && in_array($elName, $this->unsafeElements))
+		if (!$allowUnsafe && in_array($elName, $this->unsafeElements, true))
 		{
 			throw new RuntimeException("'" . $elName . "' elements are unsafe and are disabled by default. Please use " . __CLASS__ . '::allowUnsafeElement() to bypass this security measure');
 		}
@@ -221,7 +221,7 @@ class Configurator extends ConfiguratorBase
 		if (!$allowUnsafe)
 		{
 			if (substr($attrName, 0, 2) === 'on'
-			 || in_array($attrName, $this->unsafeAttributes))
+			 || in_array($attrName, $this->unsafeAttributes, true))
 			{
 				throw new RuntimeException("'" . $attrName . "' attributes are unsafe and are disabled by default. Please use " . __CLASS__ . '::allowUnsafeAttribute() to bypass this security measure');
 			}

@@ -6,11 +6,13 @@
 	"keywords": ["dom", "xsl", "xslt"],
 	"license": "MIT",
 	"require": {
-		"php":     ">=8.0",
+		"php":     "^8.1",
 		"ext-dom": "*"
 	},
 	"require-dev": {
-		"phpunit/phpunit": "^10.0"
+		"phpunit/phpunit": "^10.0",
+		"s9e/repdoc":      "dev-wip",
+		"friendsofphp/php-cs-fixer": "^3.52"
 	},
 	"autoload": {
 		"psr-4": {
@@ -23,6 +25,8 @@
 		}
 	},
 	"scripts": {
+		"patch-docs": "vendor/bin/repdoc README.md",
+		"patch-files": "php scripts/patchMethodAnnotations.php",
 		"test": "vendor/bin/phpunit"
 	}
 }

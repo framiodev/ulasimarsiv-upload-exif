@@ -20,6 +20,12 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
     );
 
     $map->get(
+        '/posts',
+        'posts',
+        $route->toForum(Content\Posts::class)
+    );
+
+    $map->get(
         '/d/{id:\d+(?:-[^/]*)?}[/{near:[^/]*}]',
         'discussion',
         $route->toForum(Content\Discussion::class)
@@ -44,6 +50,24 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
     );
 
     $map->get(
+        '/notifications/unsubscribe/{userId}/{token}',
+        'notifications.unsubscribe',
+        $route->toController(Controller\UnsubscribeViewController::class)
+    );
+
+    $map->post(
+        '/notifications/unsubscribe/confirm',
+        'notifications.unsubscribe.confirm',
+        $route->toController(Controller\UnsubscribeActionController::class)
+    );
+
+    $map->get(
+        '/logout',
+        'logoutPage',
+        $route->toController(Controller\LogOutViewController::class)
+    );
+
+    $map->post(
         '/logout',
         'logout',
         $route->toController(Controller\LogOutController::class)
@@ -53,6 +77,12 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
         '/global-logout',
         'globalLogout',
         $route->toController(Controller\GlobalLogOutController::class)
+    );
+
+    $map->get(
+        '/maintenance/login',
+        'maintenance.login',
+        $route->toController(Controller\LogInViewController::class)
     );
 
     $map->post(

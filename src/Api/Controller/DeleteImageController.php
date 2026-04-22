@@ -1,11 +1,11 @@
 <?php
 
-namespace UlasimInfo\UploadExif\Api\Controller;
+namespace UlasimArsiv\UploadExif\Api\Controller;
 
 use Flarum\Http\RequestUtil;
 use Flarum\Api\Controller\AbstractDeleteController;
 use Psr\Http\Message\ServerRequestInterface;
-use UlasimInfo\UploadExif\Database\SpotterImage;
+use UlasimArsiv\UploadExif\Database\SpotterImage;
 use Illuminate\Support\Arr;
 use Laminas\Diactoros\Response\EmptyResponse;
 use Google\Cloud\Storage\StorageClient;

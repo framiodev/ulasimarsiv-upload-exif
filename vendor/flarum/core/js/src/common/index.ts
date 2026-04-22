@@ -15,6 +15,8 @@ import localizedFormat from 'dayjs/plugin/localizedFormat';
 dayjs.extend(relativeTime);
 dayjs.extend(localizedFormat);
 
+import './registry';
+
 import patchMithril from './utils/patchMithril';
 
 patchMithril(window);
@@ -22,8 +24,6 @@ patchMithril(window);
 import app from './app';
 
 export { app };
-
-import './utils/arrayFlatPolyfill';
 
 const tooltipGen = $.fn.tooltip;
 

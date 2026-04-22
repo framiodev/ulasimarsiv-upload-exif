@@ -18,14 +18,9 @@ use Psr\Http\Server\RequestHandlerInterface;
 
 class SyncAbandonedExtensionsController implements RequestHandlerInterface
 {
-    /**
-     * @var AbandonedExtensionsFetcher
-     */
-    protected $fetcher;
-
-    public function __construct(AbandonedExtensionsFetcher $fetcher)
-    {
-        $this->fetcher = $fetcher;
+    public function __construct(
+        protected AbandonedExtensionsFetcher $fetcher,
+    ) {
     }
 
     public function handle(ServerRequestInterface $request): ResponseInterface

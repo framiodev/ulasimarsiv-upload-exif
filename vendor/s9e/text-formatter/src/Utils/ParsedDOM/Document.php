@@ -8,7 +8,7 @@
 namespace s9e\TextFormatter\Utils\ParsedDOM;
 
 use const LIBXML_NSCLEAN, SORT_STRING, false;
-use function ksort, substr, strpos;
+use function class_alias, class_exists, ksort, substr, strpos;
 use s9e\SweetDOM\Document as SweetDocument;
 use s9e\TextFormatter\Configurator\Validators\TagName;
 use s9e\TextFormatter\Configurator\Validators\AttributeName;
@@ -26,6 +26,11 @@ class Document extends SweetDocument
 	{
 		parent::__construct($version, $encoding);
 
+		// Create an alias to whichever SweetDOM\Element subclass is used on current PHP version
+		if (!class_exists(SweetElement::class, false))
+		{
+			class_alias($this->getExtendedClassMap()['DOMElement'], SweetElement::class, false);
+		}
 		$this->registerNodeClass('DOMElement', Element::class);
 	}
 
@@ -51,10 +56,7 @@ class Document extends SweetDocument
 		$nodeName = $this->documentElement->firstOf('.//*[name() != "br"][name() != "p"]') ? 'r' : 't';
 
 		$root = $this->createElement($nodeName);
-		while (isset($this->documentElement->firstChild))
-		{
-			$root->appendChild($this->documentElement->firstChild);
-		}
+		$root->append(...$this->documentElement->childNodes);
 		$this->documentElement->replaceWith($root);
 	}
 

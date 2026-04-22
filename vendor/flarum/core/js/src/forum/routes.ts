@@ -2,14 +2,11 @@ import ForumApplication from './ForumApplication';
 import IndexPage from './components/IndexPage';
 import DiscussionPage from './components/DiscussionPage';
 import PostsUserPage from './components/PostsUserPage';
-import DiscussionsUserPage from './components/DiscussionsUserPage';
-import SettingsPage from './components/SettingsPage';
-import NotificationsPage from './components/NotificationsPage';
 import DiscussionPageResolver from './resolvers/DiscussionPageResolver';
+import UserPageResolver from './resolvers/UserPageResolver';
 import Discussion from '../common/models/Discussion';
 import type Post from '../common/models/Post';
 import type User from '../common/models/User';
-import UserSecurityPage from './components/UserSecurityPage';
 
 /**
  * Helper functions to generate URLs to form pages.
@@ -26,17 +23,22 @@ export interface ForumRoutes {
 export default function (app: ForumApplication) {
   app.routes = {
     index: { path: '/all', component: IndexPage },
+    posts: { path: '/posts', component: () => import('./components/PostsPage') },
 
     discussion: { path: '/d/:id', component: DiscussionPage, resolverClass: DiscussionPageResolver },
     'discussion.near': { path: '/d/:id/:near', component: DiscussionPage, resolverClass: DiscussionPageResolver },
 
-    user: { path: '/u/:username', component: PostsUserPage },
-    'user.posts': { path: '/u/:username', component: PostsUserPage },
-    'user.discussions': { path: '/u/:username/discussions', component: DiscussionsUserPage },
+    user: { path: '/u/:username', component: PostsUserPage, resolverClass: UserPageResolver },
+    'user.posts': { path: '/u/:username', component: PostsUserPage, resolverClass: UserPageResolver },
+    'user.discussions': {
+      path: '/u/:username/discussions',
+      component: () => import('./components/DiscussionsUserPage'),
+      resolverClass: UserPageResolver,
+    },
 
-    settings: { path: '/settings', component: SettingsPage },
-    'user.security': { path: '/u/:username/security', component: UserSecurityPage },
-    notifications: { path: '/notifications', component: NotificationsPage },
+    settings: { path: '/settings', component: () => import('./components/SettingsPage') },
+    'user.security': { path: '/u/:username/security', component: () => import('./components/UserSecurityPage'), resolverClass: UserPageResolver },
+    notifications: { path: '/notifications', component: () => import('./components/NotificationsPage') },
   };
 }
 

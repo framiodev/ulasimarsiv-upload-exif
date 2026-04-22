@@ -16,14 +16,11 @@ use Laminas\Diactoros\Uri;
 use Psr\Http\Message\UriInterface;
 use RuntimeException;
 
-class Config implements ArrayAccess
+readonly class Config implements ArrayAccess
 {
-    private $data;
-
-    public function __construct(array $data)
-    {
-        $this->data = $data;
-
+    public function __construct(
+        private array $data
+    ) {
         $this->requireKeys('url');
     }
 
@@ -37,12 +34,61 @@ class Config implements ArrayAccess
         return $this->data['debug'] ?? false;
     }
 
-    public function inMaintenanceMode(): bool
+    public function queueDriver(): ?string
     {
-        return $this->data['offline'] ?? false;
+        return $this->data['queue']['driver'] ?? null;
     }
 
-    private function requireKeys(...$keys)
+    public function inMaintenanceMode(): bool
+    {
+        return $this->inHighMaintenanceMode() || $this->inLowMaintenanceMode() || $this->inSafeMode();
+    }
+
+    public function inHighMaintenanceMode(): bool
+    {
+        return $this->maintenanceMode() === MaintenanceMode::HIGH;
+    }
+
+    public function inLowMaintenanceMode(): bool
+    {
+        return $this->maintenanceMode() === MaintenanceMode::LOW;
+    }
+
+    public function inSafeMode(): bool
+    {
+        return $this->maintenanceMode() === MaintenanceMode::SAFE;
+    }
+
+    public function maintenanceMode(): string
+    {
+        return match ($mode = $this->data['offline'] ?? MaintenanceMode::NONE) {
+            true => MaintenanceMode::HIGH,
+            false => MaintenanceMode::NONE,
+            default => $mode,
+        };
+    }
+
+    public function safeModeExtensions(): ?array
+    {
+        return $this->data['safe_mode_extensions'] ?? null;
+    }
+
+    public function fontawesomeSource(): ?string
+    {
+        return $this->data['fontawesome']['source'] ?? null;
+    }
+
+    public function fontawesomeCdnUrl(): ?string
+    {
+        return $this->data['fontawesome']['cdn_url'] ?? null;
+    }
+
+    public function fontawesomeKitUrl(): ?string
+    {
+        return $this->data['fontawesome']['kit_url'] ?? null;
+    }
+
+    private function requireKeys(mixed ...$keys): void
     {
         foreach ($keys as $key) {
             if (! array_key_exists($key, $this->data)) {
@@ -53,15 +99,14 @@ class Config implements ArrayAccess
         }
     }
 
-    #[\ReturnTypeWillChange]
-    public function offsetGet($offset)
+    public function offsetGet($offset): mixed
     {
-        return Arr::get($this->data, $offset);
+        return Arr::get($this->data, $offset, Arr::get($this->defaults(), $offset));
     }
 
     public function offsetExists($offset): bool
     {
-        return Arr::has($this->data, $offset);
+        return Arr::has($this->data, $offset) || Arr::has($this->defaults(), $offset);
     }
 
     public function offsetSet($offset, $value): void
@@ -72,5 +117,20 @@ class Config implements ArrayAccess
     public function offsetUnset($offset): void
     {
         throw new RuntimeException('The Config is immutable');
+    }
+
+    public function environment(): string
+    {
+        return $this->data['env'] ?? 'production';
+    }
+
+    protected function defaults(): array
+    {
+        // Mostly needed for Laravel internals.
+        return [
+            'app' => [
+                'timezone' => 'UTC',
+            ],
+        ];
     }
 }

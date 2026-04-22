@@ -9,8 +9,11 @@
  * - All of the attrs for ComposerBody
  * - `titlePlaceholder`
  */
-export default class DiscussionComposer extends ComposerBody {
+export default class DiscussionComposer extends ComposerBody<import("./ComposerBody").IComposerBodyAttrs> {
+    static focusOnSelector: () => string;
     static initAttrs(attrs: any): void;
+    constructor();
+    oninit(vnode: any): void;
     /**
      * The value of the title input.
      *

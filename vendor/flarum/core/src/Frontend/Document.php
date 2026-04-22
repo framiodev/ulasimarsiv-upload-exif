@@ -9,7 +9,11 @@
 
 namespace Flarum\Frontend;
 
+use Flarum\Foundation\Config;
+use Flarum\Frontend\Compiler\FileVersioner;
+use Flarum\Frontend\Compiler\VersionerInterface;
 use Flarum\Frontend\Driver\TitleDriverInterface;
+use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Illuminate\Contracts\Support\Renderable;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
@@ -23,66 +27,48 @@ class Document implements Renderable
 {
     /**
      * The title of the document, displayed in the <title> tag.
-     *
-     * @var null|string
      */
-    public $title;
+    public ?string $title = null;
 
     /**
      * The language of the document, displayed as the value of the attribute `lang` in the <html> tag.
-     *
-     * @var null|string
      */
-    public $language;
+    public ?string $language = null;
 
     /**
      * The text direction of the document, displayed as the value of the attribute `dir` in the <html> tag.
-     *
-     * @var null|string
      */
-    public $direction;
+    public ?string $direction = null;
 
     /**
      * The name of the frontend app view to display.
-     *
-     * @var string
      */
-    public $appView = 'flarum::frontend.app';
+    public string $appView = 'flarum::frontend.app';
 
     /**
      * The name of the frontend layout view to display.
-     *
-     * @var string
      */
-    public $layoutView;
+    public string $layoutView;
 
     /**
      * The name of the frontend content view to display.
-     *
-     * @var string
      */
-    public $contentView = 'flarum::frontend.content';
+    public string $contentView = 'flarum::frontend.content';
 
     /**
      * The SEO content of the page, displayed within the layout in <noscript> tags.
-     *
-     * @var string|Renderable
      */
-    public $content;
+    public string|Renderable|null $content = null;
 
     /**
      * Other variables to preload into the Flarum JS.
-     *
-     * @var array
      */
-    public $payload = [];
+    public array $payload = [];
 
     /**
      * An array of meta tags to append to the page's <head>.
-     *
-     * @var array
      */
-    public $meta = [];
+    public array $meta = [];
 
     /**
      * The canonical URL for this page.
@@ -90,56 +76,48 @@ class Document implements Renderable
      * This will signal to search engines what URL should be used for this
      * content, if it can be found under multiple addresses. This is an
      * important tool to tackle duplicate content.
-     *
-     * @var null|string
      */
-    public $canonicalUrl;
+    public ?string $canonicalUrl = null;
 
     /**
      * Which page of content are we on?
      *
      * This is used to build prev/next meta links for SEO.
-     *
-     * @var null|int
      */
-    public $page;
+    public ?int $page = null;
 
     /**
      * Is there a next page?
      *
      * This is used with $page to build next meta links for SEO.
-     *
-     * @var null|bool
      */
-    public $hasNextPage;
+    public ?bool $hasNextPage = null;
 
     /**
      * An array of strings to append to the page's <head>.
-     *
-     * @var array
      */
-    public $head = [];
+    public array $head = [];
+
+    /**
+     * Inline critical CSS emitted before the async stylesheet links.
+     * Populated by FrontendServiceProvider to prevent a flash of unstyled content.
+     */
+    public string $criticalCss = '';
 
     /**
      * An array of strings to prepend before the page's </body>.
-     *
-     * @var array
      */
-    public $foot = [];
+    public array $foot = [];
 
     /**
      * An array of JavaScript URLs to load.
-     *
-     * @var array
      */
-    public $js = [];
+    public array $js = [];
 
     /**
      * An array of CSS URLs to load.
-     *
-     * @var array
      */
-    public $css = [];
+    public array $css = [];
 
     /**
      * An array of preloaded assets.
@@ -161,33 +139,35 @@ class Document implements Renderable
      *
      * @var array
      */
-    public $preloads = [];
+    public array $preloads = [];
 
     /**
-     * @var Factory
+     * Document extra attributes.
+     *
+     * @var array<string, string|callable|array>
      */
-    protected $view;
+    public array $extraAttributes = [
+        'class' => [],
+    ];
 
     /**
-     * @var array
+     * We need the versioner to get the revisions of split chunks.
      */
-    protected $forumApiDocument;
+    protected VersionerInterface $versioner;
 
-    /**
-     * @var Request
-     */
-    protected $request;
-
-    public function __construct(Factory $view, array $forumApiDocument, Request $request)
-    {
-        $this->view = $view;
-        $this->forumApiDocument = $forumApiDocument;
-        $this->request = $request;
+    public function __construct(
+        protected Factory $view,
+        protected array $forumApiDocument,
+        protected Request $request,
+        protected TitleDriverInterface $titleDriver,
+        protected Config $config,
+        FilesystemFactory $filesystem
+    ) {
+        $this->versioner = new FileVersioner(
+            $filesystem->disk('flarum-assets')
+        );
     }
 
-    /**
-     * @return string
-     */
     public function render(): string
     {
         $this->view->share('forum', Arr::get($this->forumApiDocument, 'data.attributes'));
@@ -195,9 +175,6 @@ class Document implements Renderable
         return $this->makeView()->render();
     }
 
-    /**
-     * @return View
-     */
     protected function makeView(): View
     {
         return $this->view->make($this->appView)->with([
@@ -209,16 +186,17 @@ class Document implements Renderable
             'js' => $this->makeJs(),
             'head' => $this->makeHead(),
             'foot' => $this->makeFoot(),
+            'criticalCss' => $this->criticalCss,
+            'extraAttributes' => $this->makeExtraAttributes(),
+            'extraClasses' => $this->makeExtraClasses(),
+            'revisions' => $this->versioner->allRevisions(),
+            'debug' => $this->config->inDebugMode(),
         ]);
     }
 
-    /**
-     * @return string
-     */
     protected function makeTitle(): string
     {
-        // @todo v2.0 inject as dependency instead
-        return resolve(TitleDriverInterface::class)->makeTitle($this, $this->request, $this->forumApiDocument);
+        return $this->titleDriver->makeTitle($this, $this->request, $this->forumApiDocument);
     }
 
     protected function makeLayout(): ?View
@@ -230,9 +208,6 @@ class Document implements Renderable
         return null;
     }
 
-    /**
-     * @return View
-     */
     protected function makeContent(): View
     {
         return $this->view->make($this->contentView)->with('content', $this->content);
@@ -251,14 +226,107 @@ class Document implements Renderable
         }, $this->preloads);
     }
 
-    /**
-     * @return string
-     */
+    protected function makeExtraClasses(): array
+    {
+        $classes = [];
+
+        $extraClasses = $this->extraAttributes['class'] ?? [];
+
+        foreach ($extraClasses as $class) {
+            if (is_callable($class)) {
+                $class = $class($this->request);
+            }
+
+            $classes = array_merge($classes, (array) $class);
+        }
+
+        return $classes;
+    }
+
+    protected function makeExtraAttributes(): string
+    {
+        $attributes = [];
+
+        foreach ($this->extraAttributes as $key => $value) {
+            if ($key === 'class') {
+                continue;
+            }
+
+            if (is_callable($value)) {
+                $value = $value($this->request);
+            }
+
+            $attributes[$key] = $value;
+        }
+
+        return array_reduce(array_keys($attributes), function (string $carry, string $key) use ($attributes): string {
+            $value = $attributes[$key];
+
+            if (is_array($value)) {
+                $value = implode(' ', $value);
+            }
+
+            return $carry.' '.$key.'="'.e($value).'"';
+        }, '');
+    }
+
+    protected function makePreconnects(): array
+    {
+        $forumOrigin = $this->config->url()->getScheme().'://'.$this->config->url()->getHost();
+
+        $urls = array_merge($this->css, $this->js, array_column($this->preloads, 'href'));
+
+        $seen = [];
+        $tags = [];
+
+        foreach ($urls as $url) {
+            if (empty($url)) {
+                continue;
+            }
+
+            $parts = parse_url($url);
+
+            if (empty($parts['host'])) {
+                continue;
+            }
+
+            $origin = $parts['scheme'].'://'.$parts['host'];
+
+            if ($origin === $forumOrigin || isset($seen[$origin])) {
+                continue;
+            }
+
+            $seen[$origin] = true;
+            $escaped = e($origin);
+            $tags[] = '<link rel="preconnect" href="'.$escaped.'" crossorigin>';
+            $tags[] = '<link rel="dns-prefetch" href="'.$escaped.'">';
+        }
+
+        return $tags;
+    }
+
     protected function makeHead(): string
     {
-        $head = array_map(function ($url) {
-            return '<link rel="stylesheet" href="'.e($url).'">';
-        }, $this->css);
+        // On warm visits (CSS already cached), a tiny inline script injects blocking
+        // <link rel="stylesheet"> tags synchronously before first paint — no FOUC, no
+        // network round-trip. On cold visits the sessionStorage keys are absent so the
+        // script exits immediately and the async preload path below takes over.
+        // Versioned URLs act as natural cache-busters: a new deploy changes the URL,
+        // the old sessionStorage key doesn't match, and the async path runs once more.
+        $head = $this->makePreconnects();
+
+        if (! empty($this->css)) {
+            $cssJson = json_encode(array_values($this->css), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
+            $head[] = '<script>(function(){var s='.$cssJson.';if(s.every(function(h){return sessionStorage.getItem("css:"+h);})){s.forEach(function(h){var l=document.createElement("link");l.rel="stylesheet";l.href=h;document.head.appendChild(l);});}Object.keys(sessionStorage).forEach(function(k){if(k.indexOf("css:")===0&&s.indexOf(k.slice(4))===-1){sessionStorage.removeItem(k);}});})();</script>';
+        }
+
+        // Async preload path for cold visits. The onload updates sessionStorage so the
+        // next page load can take the fast synchronous path above.
+        foreach ($this->css as $url) {
+            $escaped = e($url);
+            $head[] = '<link rel="preload" href="'.$escaped.'" as="style" fetchpriority="high" onload="sessionStorage.setItem(\'css:\'+this.href,\'1\');this.onload=null;this.rel=\'stylesheet\'">'
+                .'<noscript><link rel="stylesheet" href="'.$escaped.'"></noscript>';
+        }
 
         if ($this->page) {
             if ($this->page > 1) {
@@ -282,9 +350,6 @@ class Document implements Renderable
         return implode("\n", array_merge($head, $this->head));
     }
 
-    /**
-     * @return string
-     */
     protected function makeJs(): string
     {
         return implode("\n", array_map(function ($url) {
@@ -292,31 +357,22 @@ class Document implements Renderable
         }, $this->js));
     }
 
-    /**
-     * @return string
-     */
     protected function makeFoot(): string
     {
         return implode("\n", $this->foot);
     }
 
-    /**
-     * @return array
-     */
     public function getForumApiDocument(): array
     {
         return $this->forumApiDocument;
     }
 
-    /**
-     * @param array $forumApiDocument
-     */
-    public function setForumApiDocument(array $forumApiDocument)
+    public function setForumApiDocument(array $forumApiDocument): void
     {
         $this->forumApiDocument = $forumApiDocument;
     }
 
-    public static function setPageParam(string $url, ?int $page)
+    public static function setPageParam(string $url, ?int $page): string
     {
         if (! $page || $page === 1) {
             return self::setQueryParam($url, 'page', null);
@@ -328,7 +384,7 @@ class Document implements Renderable
     /**
      * Set or override a query param on a string URL to a particular value.
      */
-    protected static function setQueryParam(string $url, string $key, ?string $value)
+    protected static function setQueryParam(string $url, string $key, ?string $value): string
     {
         if (filter_var($url, FILTER_VALIDATE_URL)) {
             $urlParts = parse_url($url);
@@ -350,8 +406,8 @@ class Document implements Renderable
             }
 
             return $newUrl;
-        } else {
-            return $url;
         }
+
+        return $url;
     }
 }

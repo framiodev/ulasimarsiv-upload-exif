@@ -2,30 +2,15 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\TemplateNormalizations;
 
-use DOMElement;
+use s9e\SweetDOM\Element;
 
 class OptimizeChoose extends AbstractChooseOptimization
 {
-	/**
-	* Adopt the children of given element's only child
-	*
-	* @param  DOMElement $branch
-	* @return void
-	*/
-	protected function adoptChildren(DOMElement $branch)
-	{
-		while ($branch->firstChild->firstChild)
-		{
-			$branch->appendChild($branch->firstChild->removeChild($branch->firstChild->firstChild));
-		}
-		$branch->removeChild($branch->firstChild);
-	}
-
 	/**
 	* Test whether all branches of current xsl:choose element share a common firstChild/lastChild
 	*
@@ -43,7 +28,7 @@ class OptimizeChoose extends AbstractChooseOptimization
 		$childNode = $branches[0]->$childType;
 		foreach ($branches as $branch)
 		{
-			if (!isset($branch->$childType) || !$this->isEqualNode($childNode, $branch->$childType))
+			if (!$childNode->isEqualNode($branch->$childType))
 			{
 				return false;
 			}
@@ -74,7 +59,7 @@ class OptimizeChoose extends AbstractChooseOptimization
 
 		foreach ($branches as $branch)
 		{
-			if ($branch->childNodes->length !== 1 || !($branch->firstChild instanceof DOMElement))
+			if ($branch->childNodes->length !== 1 || !($branch->firstChild instanceof Element))
 			{
 				return false;
 			}
@@ -95,10 +80,10 @@ class OptimizeChoose extends AbstractChooseOptimization
 	protected function moveFirstChildBefore()
 	{
 		$branches = $this->getBranches();
-		$this->choose->parentNode->insertBefore(array_pop($branches)->firstChild, $this->choose);
+		$this->choose->before(array_pop($branches)->firstChild);
 		foreach ($branches as $branch)
 		{
-			$branch->removeChild($branch->firstChild);
+			$branch->firstChild->remove();
 		}
 	}
 
@@ -110,18 +95,10 @@ class OptimizeChoose extends AbstractChooseOptimization
 	protected function moveLastChildAfter()
 	{
 		$branches = $this->getBranches();
-		$node     = array_pop($branches)->lastChild;
-		if (isset($this->choose->nextSibling))
-		{
-			$this->choose->parentNode->insertBefore($node, $this->choose->nextSibling);
-		}
-		else
-		{
-			$this->choose->parentNode->appendChild($node);
-		}
+		$this->choose->after(array_pop($branches)->lastChild);
 		foreach ($branches as $branch)
 		{
-			$branch->removeChild($branch->lastChild);
+			$branch->lastChild->remove();
 		}
 	}
 
@@ -140,7 +117,7 @@ class OptimizeChoose extends AbstractChooseOptimization
 		}
 		if ($this->isEmpty())
 		{
-			$this->choose->parentNode->removeChild($this->choose);
+			$this->choose->remove();
 		}
 		else
 		{
@@ -198,20 +175,17 @@ class OptimizeChoose extends AbstractChooseOptimization
 	protected function optimizeEmptyBranch()
 	{
 		$query = 'count(xsl:when) = 1 and count(xsl:when/node()) = 0 and xsl:otherwise';
-		if (!$this->xpath->evaluate($query, $this->choose))
+		if (!$this->choose->evaluate($query))
 		{
 			return;
 		}
 
 		// test="@foo" becomes test="not(@foo)"
-		$when = $this->xpath('xsl:when', $this->choose)[0];
+		$when = $this->choose->firstOf('xsl:when');
 		$when->setAttribute('test', 'not(' . $when->getAttribute('test') . ')');
 
-		$otherwise = $this->xpath('xsl:otherwise', $this->choose)[0];
-		while ($otherwise->firstChild)
-		{
-			$when->appendChild($otherwise->removeChild($otherwise->firstChild));
-		}
+		$otherwise = $this->choose->firstOf('xsl:otherwise');
+		$when->append(...$otherwise->childNodes);
 	}
 
 	/**
@@ -222,9 +196,9 @@ class OptimizeChoose extends AbstractChooseOptimization
 	protected function optimizeEmptyOtherwise()
 	{
 		$query = 'xsl:otherwise[count(node()) = 0]';
-		foreach ($this->xpath($query, $this->choose) as $otherwise)
+		foreach ($this->choose->query($query) as $otherwise)
 		{
-			$this->choose->removeChild($otherwise);
+			$otherwise->remove();
 		}
 	}
 
@@ -236,19 +210,13 @@ class OptimizeChoose extends AbstractChooseOptimization
 	protected function optimizeSingleBranch()
 	{
 		$query = 'count(xsl:when) = 1 and not(xsl:otherwise)';
-		if (!$this->xpath->evaluate($query, $this->choose))
+		if (!$this->choose->evaluate($query))
 		{
 			return;
 		}
-		$when = $this->xpath('xsl:when', $this->choose)[0];
-		$if   = $this->createElement('xsl:if');
-		$if->setAttribute('test', $when->getAttribute('test'));
-		while ($when->firstChild)
-		{
-			$if->appendChild($when->removeChild($when->firstChild));
-		}
-
-		$this->choose->parentNode->replaceChild($if, $this->choose);
+		$when = $this->choose->firstOf('xsl:when');
+		$if   = $this->choose->replaceWithXslIf($when->getAttribute('test'));
+		$if->append(...$when->childNodes);
 	}
 
 	/**
@@ -261,12 +229,13 @@ class OptimizeChoose extends AbstractChooseOptimization
 	protected function reparentChild()
 	{
 		$branches  = $this->getBranches();
-		$childNode = $branches[0]->firstChild->cloneNode();
-		$childNode->appendChild($this->choose->parentNode->replaceChild($childNode, $this->choose));
-
+		$outerNode = $branches[0]->firstChild->cloneNode();
 		foreach ($branches as $branch)
 		{
-			$this->adoptChildren($branch);
+			$branch->append(...$branch->firstChild->childNodes);
+			$branch->firstChild->remove();
 		}
+		$this->choose->replaceWith($outerNode);
+		$outerNode->appendChild($this->choose);
 	}
 }

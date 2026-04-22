@@ -2,6 +2,7 @@ import app from '../../forum/app';
 import ComposerBody from './ComposerBody';
 import extractText from '../../common/utils/extractText';
 import Stream from '../../common/utils/Stream';
+import haptic from '../../common/utils/haptic';
 
 /**
  * The `DiscussionComposer` component displays the composer content for starting
@@ -15,6 +16,8 @@ import Stream from '../../common/utils/Stream';
  * - `titlePlaceholder`
  */
 export default class DiscussionComposer extends ComposerBody {
+  static focusOnSelector = () => '.DiscussionComposer-title';
+
   static initAttrs(attrs) {
     super.initAttrs(attrs);
 
@@ -47,7 +50,7 @@ export default class DiscussionComposer extends ComposerBody {
       'discussionTitle',
       <h3>
         <input
-          className="FormControl"
+          className="FormControl DiscussionComposer-title"
           bidi={this.title}
           placeholder={this.attrs.titlePlaceholder}
           disabled={!!this.attrs.disabled}
@@ -92,6 +95,7 @@ export default class DiscussionComposer extends ComposerBody {
   }
 
   onsubmit() {
+    haptic('success');
     this.loading = true;
 
     const data = this.data();

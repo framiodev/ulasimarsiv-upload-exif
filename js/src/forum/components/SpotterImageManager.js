@@ -15,7 +15,7 @@ class SpotterImageCard extends Component {
   fetchExifData() {
     app.request({
       method: 'GET',
-      url: app.forum.attribute('apiUrl') + '/spotter-image/' + this.id
+      url: app.forum.attribute('apiUrl') + '/ulasimarsiv-image/' + this.id
     }).then(response => {
       this.data = response;
       m.redraw();
@@ -37,7 +37,7 @@ class SpotterImageCard extends Component {
     if (!this.data) return null;
 
     const isAdmin = app.session.user && app.session.user.isAdmin();
-    const settingValue = app.forum.attribute('ulasiminfo-upload-exif.show_exif_publicly');
+    const settingValue = app.forum.attribute('ulasimarsiv-upload-exif.show_exif_publicly');
     const showPublicly = settingValue === '1' || settingValue === true;
     const canSeeExif = showPublicly || isAdmin;
 
@@ -57,7 +57,7 @@ class SpotterImageCard extends Component {
         {/* DÜZELTİLMİŞ CSS: ARTIK ANA KAPSAYICIYA (RESİM DAHİL) BAKACAK */}
         <style>{`
             /* Ana kapsayıcıyı referans noktası yap */
-            .spotter-image-container {
+            .ulasimarsiv-image-container {
                 position: relative !important;
                 display: block;
             }
@@ -69,9 +69,9 @@ class SpotterImageCard extends Component {
                 transition: opacity 0.2s ease, visibility 0.2s ease;
             }
 
-            /* HİLE BURADA: Ana kapsayıcı (.spotter-image-container) hover olunca göster */
+            /* HİLE BURADA: Ana kapsayıcı (.ulasimarsiv-image-container) hover olunca göster */
             /* Bu sayede resmin üzerine gelince de çalışır */
-            .spotter-image-container:hover .SpotterCard-overlay-controls {
+            .ulasimarsiv-image-container:hover .SpotterCard-overlay-controls {
                 opacity: 1;
                 visibility: visible;
             }
@@ -179,7 +179,7 @@ export default {
       const postBody = this.element.querySelector('.Post-body');
       if (!postBody) return;
 
-      const containers = postBody.querySelectorAll('.spotter-image-container');
+      const containers = postBody.querySelectorAll('.ulasimarsiv-image-container');
       containers.forEach(el => {
         const id = el.getAttribute('data-id');
         const exifPlaceholder = el.querySelector('.spotter-exif-placeholder');
@@ -191,7 +191,7 @@ export default {
 
       const contentImages = postBody.querySelectorAll('img');
       contentImages.forEach(img => {
-          if (!img.closest('.spotter-image-container') && 
+          if (!img.closest('.ulasimarsiv-image-container') && 
               !img.classList.contains('emoji') && 
               !img.classList.contains('Avatar')) {
               

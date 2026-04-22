@@ -2,12 +2,12 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\TemplateNormalizations;
 
-use DOMAttr;
+use s9e\SweetDOM\Attr;
 use s9e\TextFormatter\Configurator\Helpers\TemplateHelper;
 
 class MinifyInlineCSS extends AbstractNormalization
@@ -15,12 +15,12 @@ class MinifyInlineCSS extends AbstractNormalization
 	/**
 	* {@inheritdoc}
 	*/
-	protected $queries = ['//*[namespace-uri() != $XSL]/@style'];
+	protected array $queries = ['//*[namespace-uri() != "' . self::XMLNS_XSL . '"]/@style'];
 
 	/**
 	* {@inheritdoc}
 	*/
-	protected function normalizeAttribute(DOMAttr $attribute)
+	protected function normalizeAttribute(Attr $attribute): void
 	{
 		$css = $attribute->nodeValue;
 

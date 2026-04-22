@@ -25,31 +25,20 @@ use Illuminate\View\Engines\PhpEngine;
 use Illuminate\View\FileViewFinder;
 use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\StreamHandler;
+use Monolog\Level;
 use Monolog\Logger;
 use Psr\Log\LoggerInterface;
 
 class UninstalledSite implements SiteInterface
 {
-    /**
-     * @var Paths
-     */
-    protected $paths;
-
-    /**
-     * @var string
-     */
-    private $baseUrl;
-
-    public function __construct(Paths $paths, string $baseUrl)
-    {
-        $this->paths = $paths;
-        $this->baseUrl = $baseUrl;
+    public function __construct(
+        protected Paths $paths,
+        private readonly string $baseUrl
+    ) {
     }
 
     /**
      * Create and boot a Flarum application instance.
-     *
-     * @return AppInterface
      */
     public function bootApp(): AppInterface
     {
@@ -60,37 +49,36 @@ class UninstalledSite implements SiteInterface
 
     protected function bootLaravel(): Container
     {
-        $container = new \Illuminate\Container\Container;
-        $laravel = new Application($container, $this->paths);
+        $app = new Application($this->paths);
 
-        $container->instance('env', 'production');
-        $container->instance('flarum.config', new Config(['url' => $this->baseUrl]));
-        $container->alias('flarum.config', Config::class);
-        $container->instance('flarum.debug', true);
-        $container->instance('config', $config = $this->getIlluminateConfig());
+        $app->instance('env', 'production');
+        $app->instance('flarum.config', new Config(['url' => $this->baseUrl]));
+        $app->alias('flarum.config', Config::class);
+        $app->instance('flarum.debug', true);
+        $app->instance('config', $this->getIlluminateConfig());
 
-        $this->registerLogger($container);
+        $this->registerLogger($app);
 
-        $laravel->register(ErrorServiceProvider::class);
-        $laravel->register(LocaleServiceProvider::class);
-        $laravel->register(FilesystemServiceProvider::class);
-        $laravel->register(SessionServiceProvider::class);
-        $laravel->register(ValidationServiceProvider::class);
+        $app->register(ErrorServiceProvider::class);
+        $app->register(LocaleServiceProvider::class);
+        $app->register(FilesystemServiceProvider::class);
+        $app->register(SessionServiceProvider::class);
+        $app->register(ValidationServiceProvider::class);
 
-        $laravel->register(InstallServiceProvider::class);
+        $app->register(InstallServiceProvider::class);
 
-        $container->singleton(
+        $app->singleton(
             SettingsRepositoryInterface::class,
             UninstalledSettingsRepository::class
         );
 
-        $container->singleton('view', function ($container) {
+        $app->singleton('view', function ($app) {
             $engines = new EngineResolver();
-            $engines->register('php', function () use ($container) {
-                return $container->make(PhpEngine::class);
+            $engines->register('php', function () use ($app) {
+                return $app->make(PhpEngine::class);
             });
-            $finder = new FileViewFinder($container->make('files'), []);
-            $dispatcher = $container->make(Dispatcher::class);
+            $finder = new FileViewFinder($app->make('files'), []);
+            $dispatcher = $app->make(Dispatcher::class);
 
             return new \Illuminate\View\Factory(
                 $engines,
@@ -99,15 +87,12 @@ class UninstalledSite implements SiteInterface
             );
         });
 
-        $laravel->boot();
+        $app->boot();
 
-        return $container;
+        return $app;
     }
 
-    /**
-     * @return ConfigRepository
-     */
-    protected function getIlluminateConfig()
+    protected function getIlluminateConfig(): ConfigRepository
     {
         return new ConfigRepository([
             'session' => [
@@ -121,13 +106,19 @@ class UninstalledSite implements SiteInterface
         ]);
     }
 
-    protected function registerLogger(Container $container)
+    protected function registerLogger(Container $container): void
     {
         $logPath = $this->paths->storage.'/logs/flarum-installer.log';
-        $handler = new StreamHandler($logPath, Logger::DEBUG);
+        $handler = new StreamHandler($logPath, Level::Debug);
         $handler->setFormatter(new LineFormatter(null, null, true, true));
 
         $container->instance('log', new Logger('Flarum Installer', [$handler]));
         $container->alias('log', LoggerInterface::class);
+
+        // Register Laravel's Log Context Repository for Laravel 12 compatibility.
+        // Note: Using string instead of ::class because this class only exists in laravel/framework.
+        $container->singleton('Illuminate\Log\Context\Repository', function () {
+            return new \Flarum\Log\Context\Repository();
+        });
     }
 }

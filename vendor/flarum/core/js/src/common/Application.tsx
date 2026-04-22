@@ -37,21 +37,27 @@ import fireApplicationError from './helpers/fireApplicationError';
 import IHistory from './IHistory';
 import IExtender from './extenders/IExtender';
 import AccessToken from './models/AccessToken';
+import SearchManager from './SearchManager';
+import { ColorScheme } from './components/ThemeMode';
+import { prepareSkipLinks } from './utils/a11y';
 
 export type FlarumScreens = 'phone' | 'tablet' | 'desktop' | 'desktop-hd';
 
 export type FlarumGenericRoute = RouteItem<any, any, any>;
 
 export interface FlarumRequestOptions<ResponseType> extends Omit<Mithril.RequestOptions<ResponseType>, 'extract'> {
-  errorHandler?: (error: RequestError) => void;
-  url: string;
-  // TODO: [Flarum 2.0] Remove deprecated option
   /**
-   * Manipulate the response text before it is parsed into JSON.
+   * Custom error handler for failed requests. Overrides the default error handler.
    *
-   * @deprecated Please use `modifyText` instead.
+   * Return `false` (sync or promise) to fall back to the default error handler.
+   * Useful for handling specific errors without displaying error alerts to the user.
+   * To always show alerts, catch the error rejected by `app.request` instead.
+   *
+   * @param error
+   * @return  `false` (sync or promise) to fall back to the default error handler.
    */
-  extract?: (responseText: string) => string;
+  errorHandler?: (error: RequestError) => void | false | Promise<void | false>;
+  url: string;
   /**
    * Manipulate the response text before it is parsed into JSON.
    *
@@ -59,6 +65,9 @@ export interface FlarumRequestOptions<ResponseType> extends Omit<Mithril.Request
    */
   modifyText?: (responseText: string) => string;
 }
+
+export type NewComponent<Comp> = new () => Comp;
+export type AsyncNewComponent<Comp> = () => Promise<any & { default: NewComponent<Comp> }>;
 
 /**
  * A valid route definition.
@@ -82,14 +91,14 @@ export type RouteItem<
       /**
        * The component to render when this route matches.
        */
-      component: new () => Comp;
+      component: NewComponent<Comp> | AsyncNewComponent<Comp>;
       /**
        * A custom resolver class.
        *
        * This should be the class itself, and **not** an instance of the
        * class.
        */
-      resolverClass?: new (component: new () => Comp, routeName: string) => DefaultResolver<Attrs, Comp, RouteArgs>;
+      resolverClass?: new (component: NewComponent<Comp> | AsyncNewComponent<Comp>, routeName: string) => DefaultResolver<Attrs, Comp, RouteArgs>;
     }
   | {
       /**
@@ -113,7 +122,7 @@ export interface RouteResolver<
    *
    * @see https://mithril.js.org/route.html#routeresolveronmatch
    */
-  onmatch(this: this, args: RouteArgs, requestedPath: string, route: string): { new (): Comp };
+  onmatch(this: this, args: RouteArgs, requestedPath: string, route: string): Promise<{ new (): Comp }>;
   /**
    * A function which renders the provided component.
    *
@@ -127,12 +136,21 @@ export interface RouteResolver<
   render?(this: this, vnode: Mithril.Vnode<Attrs, Comp>): Mithril.Children;
 }
 
+export enum MaintenanceMode {
+  NO_MAINTENANCE = 'none',
+  HIGH_MAINTENANCE = 'high',
+  LOW_MAINTENANCE = 'low',
+  SAFE_MODE = 'safe',
+}
+
 export interface ApplicationData {
   apiDocument: ApiPayload | null;
   locale: string;
   locales: Record<string, string>;
   resources: SavedModelData[];
   session: { userId: number; csrfToken: string };
+  maintenanceMode?: MaintenanceMode;
+  bisecting?: boolean;
   [key: string]: unknown;
 }
 
@@ -188,6 +206,8 @@ export default class Application {
     notifications: Notification,
   });
 
+  search!: SearchManager;
+
   /**
    * A local cache that can be used to store data at the application level, so
    * that is persists between different routes.
@@ -237,8 +257,10 @@ export default class Application {
 
   data!: ApplicationData;
 
+  allowUserColorScheme!: boolean;
+
   refs: Record<string, string> = {
-    fontawesome: 'https://fontawesome.com/v5/search?o=r&m=free',
+    fontawesome: 'https://fontawesome.com/icons?o=r&m=free',
   };
 
   private _title: string = '';
@@ -268,22 +290,32 @@ export default class Application {
 
   initialRoute!: string;
 
+  /**
+   * @internal
+   */
+  public currentInitializerExtension: string | null = null;
+
+  private handledErrors: { extension: null | string; errorId: string; error: any }[] = [];
+
+  private beforeMounts: (() => void)[] = [];
+
   public load(payload: Application['data']) {
     this.data = payload;
     this.translator.setLocale(payload.locale);
   }
 
-  public boot() {
+  protected initialize(): CallableFunction[] {
     const caughtInitializationErrors: CallableFunction[] = [];
 
     this.initializers.toArray().forEach((initializer) => {
+      this.currentInitializerExtension = initializer.itemName.includes('/')
+        ? initializer.itemName.replace(/(\/flarum-ext-)|(\/flarum-)/g, '-')
+        : initializer.itemName;
+
       try {
         initializer(this);
       } catch (e) {
-        const extension = initializer.itemName.includes('/')
-          ? initializer.itemName.replace(/(\/flarum-ext-)|(\/flarum-)/g, '-')
-          : initializer.itemName;
-
+        const extension = this.currentInitializerExtension;
         caughtInitializationErrors.push(() =>
           fireApplicationError(
             extractText(app.translator.trans('core.lib.error.extension_initialiation_failed_message', { extension })),
@@ -294,17 +326,34 @@ export default class Application {
       }
     });
 
+    return caughtInitializationErrors;
+  }
+
+  public boot() {
+    const caughtInitializationErrors: CallableFunction[] = this.initialize();
+
     this.store.pushPayload({ data: this.data.resources });
 
     this.forum = this.store.getById('forums', '1')!;
 
     this.session = new Session(this.store.getById<User>('users', String(this.data.session.userId)) ?? null, this.data.session.csrfToken);
 
+    this.runBeforeMount();
+
     this.mount();
 
     this.initialRoute = window.location.href;
 
     caughtInitializationErrors.forEach((handler) => handler());
+  }
+
+  public beforeMount(callback: () => void) {
+    this.beforeMounts.push(callback);
+  }
+
+  protected runBeforeMount(): void {
+    this.beforeMounts.forEach((callback) => callback());
+    this.beforeMounts = [];
   }
 
   public bootExtensions(extensions: Record<string, { extend?: IExtender[] }>) {
@@ -352,7 +401,61 @@ export default class Application {
 
     document.body.classList.add('ontouchstart' in window ? 'touch' : 'no-touch');
 
+    this.initColorScheme();
+
     liveHumanTimes();
+
+    prepareSkipLinks();
+  }
+
+  private initColorScheme(forumDefault: string | null = null): void {
+    forumDefault ??= app.forum.attribute('colorScheme') ?? 'auto';
+    this.allowUserColorScheme = forumDefault === 'auto';
+    const userConfiguredPreference = this.session.user?.preferences()?.colorScheme;
+
+    let scheme;
+
+    if (this.allowUserColorScheme) {
+      scheme = userConfiguredPreference;
+    }
+
+    scheme ||= forumDefault;
+
+    this.setColorScheme(scheme);
+
+    // Listen for browser color scheme changes and update the theme accordingly
+    if (this.allowUserColorScheme) {
+      this.watchSystemColorSchemePreference(() => {
+        this.initColorScheme(forumDefault);
+      });
+    }
+  }
+
+  getSystemColorSchemePreference(): ColorScheme | string {
+    let colorScheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+
+    if (window.matchMedia('(prefers-contrast: more)').matches) {
+      colorScheme += '-hc';
+    }
+
+    return colorScheme;
+  }
+
+  watchSystemColorSchemePreference(callback: () => void): void {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', callback);
+    window.matchMedia('(prefers-contrast: more)').addEventListener('change', callback);
+  }
+
+  setColorScheme(scheme: ColorScheme | string): void {
+    if (scheme === ColorScheme.Auto) {
+      scheme = this.getSystemColorSchemePreference();
+    }
+
+    document.documentElement.setAttribute('data-theme', scheme);
+  }
+
+  setColoredHeader(value: boolean): void {
+    document.documentElement.setAttribute('data-colored-header', value ? 'true' : 'false');
   }
 
   /**
@@ -435,7 +538,7 @@ export default class Application {
   }
 
   protected transformRequestOptions<ResponseType>(flarumOptions: FlarumRequestOptions<ResponseType>): InternalFlarumRequestOptions<ResponseType> {
-    const { background, deserialize, extract, modifyText, ...tmpOptions } = { ...flarumOptions };
+    const { background, deserialize, modifyText, ...tmpOptions } = { ...flarumOptions };
 
     // Unless specified otherwise, requests should run asynchronously in the
     // background, so that they don't prevent redraws from occurring.
@@ -446,11 +549,6 @@ export default class Application {
     // error message to the user instead.
 
     const defaultDeserialize = (response: string) => response as ResponseType;
-
-    // When extracting the data from the response, we can check the server
-    // response code and show an error message to the user if something's gone
-    // awry.
-    const originalExtract = modifyText || extract;
 
     const options: InternalFlarumRequestOptions<ResponseType> = {
       background: background ?? defaultBackground,
@@ -475,11 +573,14 @@ export default class Application {
       options.method = 'POST';
     }
 
+    // When extracting the data from the response, we can check the server
+    // response code and show an error message to the user if something's gone
+    // awry.
     options.extract = (xhr: XMLHttpRequest) => {
       let responseText;
 
-      if (originalExtract) {
-        responseText = originalExtract(xhr.responseText);
+      if (modifyText) {
+        responseText = modifyText(xhr.responseText);
       } else {
         responseText = xhr.responseText;
       }
@@ -525,7 +626,10 @@ export default class Application {
   /**
    * By default, show an error alert, and log the error to the console.
    */
-  protected requestErrorCatch<ResponseType>(error: RequestError, customErrorHandler: FlarumRequestOptions<ResponseType>['errorHandler']) {
+  protected async requestErrorCatch<ResponseType>(
+    error: RequestError,
+    customErrorHandler: FlarumRequestOptions<ResponseType>['errorHandler']
+  ): Promise<never> {
     // the details property is decoded to transform escaped characters such as '\n'
     const formattedErrors = error.response?.errors?.map((e) => decodeURI(e.detail ?? '')) ?? [];
 
@@ -557,7 +661,11 @@ export default class Application {
         break;
 
       default:
-        if (this.requestWasCrossOrigin(error)) {
+        const code = error.response?.errors?.[0]?.code;
+
+        if (code === 'db_error' && app.session.user?.isAdmin()) {
+          content = app.translator.trans('core.lib.error.db_error_message');
+        } else if (this.requestWasCrossOrigin(error)) {
           content = app.translator.trans('core.lib.error.generic_cross_origin_message');
         } else {
           content = app.translator.trans('core.lib.error.generic_message');
@@ -576,9 +684,17 @@ export default class Application {
       ],
     };
 
+    // Use the default error handler if no custom one was provided OR if we're handling falling back to the default.
+    let useDefaultHandler = !customErrorHandler;
+
     if (customErrorHandler) {
-      customErrorHandler(error);
-    } else {
+      const output = await customErrorHandler(error);
+
+      // If the custom handler returned false, we should fall back to the default handler.
+      useDefaultHandler = output === false;
+    }
+
+    if (useDefaultHandler) {
       this.requestErrorDefaultHandler(error, isDebug, formattedErrors);
     }
 
@@ -594,7 +710,7 @@ export default class Application {
    * @protected
    */
   protected requestWasCrossOrigin(error: RequestError): boolean {
-    return new URL(error.options.url, document.baseURI).origin !== window.location.origin;
+    return new URL(error.options?.url, document.baseURI).origin !== window.location.origin;
   }
 
   protected requestErrorDefaultHandler(e: unknown, isDebug: boolean, formattedErrors: string[]): void {
@@ -614,7 +730,9 @@ export default class Application {
         console.groupEnd();
       }
 
-      if (e.alert) {
+      if (e.status === 500 && isDebug) {
+        app.modal.show(RequestErrorModal, { error: e, formattedError: formattedErrors });
+      } else if (e.alert) {
         this.requestErrorAlert = this.alerts.show(e.alert, e.alert.content);
       }
     } else {
@@ -647,5 +765,13 @@ export default class Application {
     const prefix = m.route.prefix === '' ? this.forum.attribute('basePath') : '';
 
     return prefix + url + (queryString ? '?' + queryString : '');
+  }
+
+  public handleErrorOnce(extension: null | string, errorId: string, userTitle: string, consoleTitle: string, error: any) {
+    if (this.handledErrors.some((e) => e.errorId === errorId)) return;
+
+    this.handledErrors.push({ extension, errorId, error });
+
+    fireApplicationError(userTitle, consoleTitle, error);
   }
 }

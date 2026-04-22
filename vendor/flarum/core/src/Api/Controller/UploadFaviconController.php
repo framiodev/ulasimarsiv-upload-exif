@@ -9,63 +9,28 @@
 
 namespace Flarum\Api\Controller;
 
-use Flarum\Foundation\ValidationException;
-use Flarum\Settings\SettingsRepositoryInterface;
-use Illuminate\Contracts\Filesystem\Factory;
-use Intervention\Image\Image;
-use Intervention\Image\ImageManager;
+use Flarum\Admin\FaviconValidator;
+use Intervention\Image\Interfaces\EncodedImageInterface;
+use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UploadedFileInterface;
-use Symfony\Contracts\Translation\TranslatorInterface;
 
 class UploadFaviconController extends UploadImageController
 {
-    protected $filePathSettingKey = 'favicon_path';
+    protected string $filePathSettingKey = 'favicon_path';
+    protected string $filenamePrefix = 'favicon';
+    protected ?string $validator = FaviconValidator::class;
 
-    protected $filenamePrefix = 'favicon';
-
-    /**
-     * @var TranslatorInterface
-     */
-    protected $translator;
-
-    /**
-     * @var ImageManager
-     */
-    protected $imageManager;
-
-    /**
-     * @param SettingsRepositoryInterface $settings
-     * @param Factory $filesystemFactory
-     */
-    public function __construct(SettingsRepositoryInterface $settings, Factory $filesystemFactory, TranslatorInterface $translator, ImageManager $imageManager)
-    {
-        parent::__construct($settings, $filesystemFactory);
-
-        $this->translator = $translator;
-        $this->imageManager = $imageManager;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    protected function makeImage(UploadedFileInterface $file): Image
+    protected function makeImage(UploadedFileInterface $file): EncodedImageInterface|StreamInterface
     {
         $this->fileExtension = pathinfo($file->getClientFilename(), PATHINFO_EXTENSION);
 
         if ($this->fileExtension === 'ico') {
-            // @todo remove in 2.0
-            throw new ValidationException([
-                'message' => strtr($this->translator->trans('validation.mimes'), [
-                    ':attribute' => 'favicon',
-                    ':values' => 'jpeg,png,gif,webp',
-                ])
-            ]);
+            return $file->getStream();
         }
 
-        $encodedImage = $this->imageManager->make($file->getStream()->getMetadata('uri'))->resize(64, 64, function ($constraint) {
-            $constraint->aspectRatio();
-            $constraint->upsize();
-        })->encode('png');
+        $encodedImage = $this->imageManager->read($file->getStream()->getMetadata('uri'))
+            ->scale(64, 64)
+            ->toPng();
 
         $this->fileExtension = 'png';
 

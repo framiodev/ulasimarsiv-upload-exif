@@ -11,42 +11,37 @@ namespace Flarum\Install\Steps;
 
 use Flarum\Database\DatabaseMigrationRepository;
 use Flarum\Database\Migrator;
+use Flarum\Install\DatabaseConfig;
 use Flarum\Install\Step;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Filesystem\Filesystem;
 
-class RunMigrations implements Step
+readonly class RunMigrations implements Step
 {
-    /**
-     * @var ConnectionInterface
-     */
-    private $database;
-
-    /**
-     * @var string
-     */
-    private $path;
-
-    public function __construct(ConnectionInterface $database, $path)
-    {
-        $this->database = $database;
-        $this->path = $path;
+    public function __construct(
+        private ConnectionInterface $database,
+        private DatabaseConfig $dbConfig,
+        private string $path
+    ) {
     }
 
-    public function getMessage()
+    public function getMessage(): string
     {
         return 'Running migrations';
     }
 
-    public function run()
+    public function run(): void
     {
         $migrator = $this->getMigrator();
 
-        $migrator->installFromSchema($this->path);
+        if (! $migrator->repositoryExists() && ! $migrator->installFromSchema($this->path, $this->dbConfig)) {
+            $migrator->getRepository()->createRepository();
+        }
+
         $migrator->run($this->path);
     }
 
-    private function getMigrator()
+    private function getMigrator(): Migrator
     {
         $repository = new DatabaseMigrationRepository(
             $this->database,

@@ -12,42 +12,29 @@ namespace Flarum\User;
 use Carbon\Carbon;
 use Flarum\Database\AbstractModel;
 use Flarum\User\Exception\InvalidConfirmationTokenException;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 /**
  * @property string $token
  * @property \Carbon\Carbon $created_at
  * @property int $user_id
- * @method static self validOrFail(string $token)
  */
 class PasswordToken extends AbstractModel
 {
-    /**
-     * The attributes that should be mutated to dates.
-     *
-     * @var array
-     */
-    protected $dates = ['created_at'];
+    protected $casts = [
+        'created_at' => 'datetime',
+        'user_id' => 'integer',
+    ];
 
-    /**
-     * Use a custom primary key for this model.
-     *
-     * @var bool
-     */
     public $incrementing = false;
 
-    /**
-     * {@inheritdoc}
-     */
     protected $primaryKey = 'token';
 
     /**
      * Generate a password token for the specified user.
-     *
-     * @param int $userId
-     * @return static
      */
-    public static function generate(int $userId)
+    public static function generate(int $userId): static
     {
         $token = new static;
 
@@ -61,17 +48,14 @@ class PasswordToken extends AbstractModel
     /**
      * Find the token with the given ID, and assert that it has not expired.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $id
-     * @return static
      * @throws InvalidConfirmationTokenException
      */
-    public function scopeValidOrFail($query, $id)
+    public static function validOrFail(string $id): static
     {
         /** @var static|null $token */
-        $token = $query->find($id);
+        $token = static::find($id);
 
-        if (! $token || $token->created_at->diffInDays() >= 1) {
+        if (! $token || $token->created_at->diffInDays(null, true) >= 1) {
             throw new InvalidConfirmationTokenException;
         }
 
@@ -79,11 +63,9 @@ class PasswordToken extends AbstractModel
     }
 
     /**
-     * Define the relationship with the owner of this password token.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo<User, $this>
      */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }

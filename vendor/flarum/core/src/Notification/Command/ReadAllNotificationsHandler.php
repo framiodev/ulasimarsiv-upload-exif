@@ -11,36 +11,23 @@ namespace Flarum\Notification\Command;
 
 use Flarum\Notification\Event\ReadAll;
 use Flarum\Notification\NotificationRepository;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Carbon;
 
 class ReadAllNotificationsHandler
 {
-    /**
-     * @var NotificationRepository
-     */
-    protected $notifications;
-
-    /**
-     * @var Dispatcher
-     */
-    protected $events;
-
-    /**
-     * @param NotificationRepository $notifications
-     * @param Dispatcher $events
-     */
-    public function __construct(NotificationRepository $notifications, Dispatcher $events)
-    {
-        $this->notifications = $notifications;
-        $this->events = $events;
+    public function __construct(
+        protected NotificationRepository $notifications,
+        protected Dispatcher $events,
+        protected CacheRepository $cache
+    ) {
     }
 
     /**
-     * @param ReadAllNotifications $command
-     * @throws \Flarum\User\Exception\PermissionDeniedException
+     * @throws \Flarum\User\Exception\NotAuthenticatedException
      */
-    public function handle(ReadAllNotifications $command)
+    public function handle(ReadAllNotifications $command): void
     {
         $actor = $command->actor;
 
@@ -49,9 +36,8 @@ class ReadAllNotificationsHandler
         $this->notifications->markAllAsRead($actor);
 
         // Invalidate notification count caches
-        $cache = resolve('cache.store');
-        $cache->forget("user.{$actor->id}.unread_notification_count");
-        $cache->forget("user.{$actor->id}.new_notification_count");
+        $this->cache->forget("user.{$actor->id}.unread_notification_count");
+        $this->cache->forget("user.{$actor->id}.new_notification_count");
 
         $this->events->dispatch(new ReadAll($actor, Carbon::now()));
     }

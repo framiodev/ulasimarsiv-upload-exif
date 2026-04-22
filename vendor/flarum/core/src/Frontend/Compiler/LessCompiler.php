@@ -11,7 +11,7 @@ namespace Flarum\Frontend\Compiler;
 
 use Flarum\Frontend\Compiler\Source\FileSource;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
+use Less_Exception_Compiler;
 use Less_Parser;
 
 /**
@@ -19,37 +19,18 @@ use Less_Parser;
  */
 class LessCompiler extends RevisionCompiler
 {
-    /**
-     * @var string
-     */
-    protected $cacheDir;
-
-    /**
-     * @var array
-     */
-    protected $importDirs = [];
-
-    /**
-     * @var array
-     */
-    protected $customFunctions = [];
-
-    /**
-     * @var Collection|null
-     */
-    protected $lessImportOverrides;
-
-    /**
-     * @var Collection|null
-     */
-    protected $fileSourceOverrides;
+    protected string $cacheDir;
+    protected array $importDirs = [];
+    protected array $customFunctions = [];
+    protected ?Collection $lessImportOverrides = null;
+    protected ?Collection $fileSourceOverrides = null;
 
     public function getCacheDir(): string
     {
         return $this->cacheDir;
     }
 
-    public function setCacheDir(string $cacheDir)
+    public function setCacheDir(string $cacheDir): void
     {
         $this->cacheDir = $cacheDir;
     }
@@ -59,22 +40,22 @@ class LessCompiler extends RevisionCompiler
         return $this->importDirs;
     }
 
-    public function setImportDirs(array $importDirs)
+    public function setImportDirs(array $importDirs): void
     {
         $this->importDirs = $importDirs;
     }
 
-    public function setLessImportOverrides(array $lessImportOverrides)
+    public function setLessImportOverrides(array $lessImportOverrides): void
     {
         $this->lessImportOverrides = new Collection($lessImportOverrides);
     }
 
-    public function setFileSourceOverrides(array $fileSourceOverrides)
+    public function setFileSourceOverrides(array $fileSourceOverrides): void
     {
         $this->fileSourceOverrides = new Collection($fileSourceOverrides);
     }
 
-    public function setCustomFunctions(array $customFunctions)
+    public function setCustomFunctions(array $customFunctions): void
     {
         $this->customFunctions = $customFunctions;
     }
@@ -88,6 +69,10 @@ class LessCompiler extends RevisionCompiler
             return '';
         }
 
+        if (! empty($this->settings->get('custom_less_error'))) {
+            unset($sources['custom_less']);
+        }
+
         $maxNestingLevel = ini_get('xdebug.max_nesting_level');
 
         ini_set('xdebug.max_nesting_level', '200');
@@ -95,9 +80,9 @@ class LessCompiler extends RevisionCompiler
         try {
             $parser = new Less_Parser([
                 'compress' => true,
+                'strictMath' => false,
                 'cache_dir' => $this->cacheDir,
                 'import_dirs' => $this->importDirs,
-                'import_callback' => $this->lessImportOverrides ? $this->overrideImports($sources) : null,
             ]);
 
             if ($this->fileSourceOverrides) {
@@ -106,7 +91,15 @@ class LessCompiler extends RevisionCompiler
 
             foreach ($sources as $source) {
                 if ($source instanceof FileSource) {
-                    $parser->parseFile($source->getPath());
+                    // If we have import overrides, parse the file content and apply them
+                    if ($this->lessImportOverrides && $this->lessImportOverrides->isNotEmpty()) {
+                        $content = file_get_contents($source->getPath());
+                        $content = $this->applyImportOverridesToContent($content);
+                        // Pass the original file path to maintain proper import resolution context
+                        $parser->parse($content, $source->getPath());
+                    } else {
+                        $parser->parseFile($source->getPath());
+                    }
                 } else {
                     $parser->parse($source->getContent());
                 }
@@ -116,12 +109,66 @@ class LessCompiler extends RevisionCompiler
                 $parser->registerFunction($name, $callback);
             }
 
-            return $parser->getCss();
+            try {
+                $compiled = $this->finalize($parser->getCss());
+
+                if (isset($sources['custom_less']) && $this->settings->get('custom_less_error')) {
+                    $this->settings->delete('custom_less_error');
+                }
+
+                return $compiled;
+            } catch (Less_Exception_Compiler $e) {
+                if (isset($sources['custom_less'])) {
+                    unset($sources['custom_less']);
+
+                    $compiled = $this->compile($sources);
+
+                    $this->settings->set('custom_less_error', $e->getMessage());
+
+                    return $compiled;
+                }
+
+                throw $e;
+            }
         } finally {
             if ($maxNestingLevel !== false) {
                 ini_set('xdebug.max_nesting_level', $maxNestingLevel);
             }
         }
+    }
+
+    protected function finalize(string $parsedCss): string
+    {
+        return str_replace('url("../webfonts/', 'url("./fonts/', $parsedCss);
+    }
+
+    /**
+     * Apply import overrides by replacing @import statements with inline content.
+     */
+    private function applyImportOverridesToContent(string $content): string
+    {
+        foreach ($this->lessImportOverrides as $override) {
+            $file = $override['file'];
+            $fileWithoutExt = preg_replace('/\.less$/i', '', $file);
+            $quotedFile = preg_quote($fileWithoutExt, '/');
+
+            // Match @import "path" or @import 'path' (with or without .less extension)
+            $pattern = '/@import\s+["\']'.$quotedFile.'(\.less)?["\'];?/i';
+
+            if (preg_match($pattern, $content)) {
+                // Read the override file content
+                $overrideContent = file_get_contents($override['newFilePath']);
+
+                // Replace the @import statement with the actual content
+                $content = preg_replace(
+                    $pattern,
+                    '/* Flarum override: '.$file.' */'."\n".$overrideContent."\n".'/* End override */',
+                    $content
+                );
+            }
+        }
+
+        return $content;
     }
 
     protected function overrideSources(array $sources): array
@@ -140,36 +187,6 @@ class LessCompiler extends RevisionCompiler
         }
 
         return $sources;
-    }
-
-    protected function overrideImports(array $sources): callable
-    {
-        $baseSources = (new Collection($sources))->filter(function ($source) {
-            return $source instanceof Source\FileSource;
-        })->map(function (FileSource $source) {
-            $path = realpath($source->getPath());
-            $path = Str::beforeLast($path, '/less/');
-
-            return [
-                'path' => $path,
-                'extensionId' => $source->getExtensionId(),
-            ];
-        })->unique('path');
-
-        return function ($evald) use ($baseSources): ?array {
-            $relativeImportPath = Str::of($evald->PathAndUri()[0])->split('/\/less\//');
-            $extensionId = $baseSources->where('path', $relativeImportPath->first())->pluck('extensionId')->first();
-
-            $overrideImport = $this->lessImportOverrides
-                ->where('file', $relativeImportPath->last())
-                ->firstWhere('extensionId', $extensionId);
-
-            if (! $overrideImport) {
-                return null;
-            }
-
-            return [$overrideImport['newFilePath'], $evald->PathAndUri()[1]];
-        };
     }
 
     protected function getCacheDifferentiator(): ?array

@@ -17,11 +17,9 @@ use Psr\Http\Server\RequestHandlerInterface as Handler;
 
 class ThrottleApi implements Middleware
 {
-    protected $throttlers;
-
-    public function __construct(array $throttlers)
-    {
-        $this->throttlers = $throttlers;
+    public function __construct(
+        protected array $throttlers
+    ) {
     }
 
     public function process(Request $request, Handler $handler): Response
@@ -33,9 +31,6 @@ class ThrottleApi implements Middleware
         return $handler->handle($request);
     }
 
-    /**
-     * @return bool
-     */
     public function throttle(Request $request): bool
     {
         $throttle = false;
@@ -47,7 +42,9 @@ class ThrottleApi implements Middleware
             // Anything else is ignored.
             if ($result === false) {
                 return false;
-            } elseif ($result === true) {
+            }
+
+            if ($result === true) {
                 $throttle = true;
             }
         }

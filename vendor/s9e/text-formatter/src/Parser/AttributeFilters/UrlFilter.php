@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Parser\AttributeFilters;
@@ -19,7 +19,7 @@ class UrlFilter
 	* @param  Logger $logger    Parser's logger
 	* @return mixed             Cleaned up URL if valid, FALSE otherwise
 	*/
-	public static function filter($attrValue, array $urlConfig, Logger $logger = null)
+	public static function filter($attrValue, array $urlConfig, ?Logger $logger = null)
 	{
 		/**
 		* Trim the URL to conform with HTML5 then parse it

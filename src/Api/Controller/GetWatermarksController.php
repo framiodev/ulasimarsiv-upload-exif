@@ -1,6 +1,6 @@
 <?php
 
-namespace UlasimInfo\UploadExif\Api\Controller;
+namespace UlasimArsiv\UploadExif\Api\Controller;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -15,8 +15,8 @@ class GetWatermarksController implements RequestHandlerInterface
         // 1. İstek yapan kullanıcıyı belirle
         $actor = RequestUtil::getActor($request);
         
-        // Kullanıcı adı (Misafir ise veya klasör bulunamazsa varsayılan 'ulasiminfo' olacak)
-        $targetUser = $actor->isGuest() ? 'ulasiminfo' : $actor->username;
+        // Kullanıcı adı (Misafir ise veya klasör bulunamazsa varsayılan 'ulasimarsiv' olacak)
+        $targetUser = $actor->isGuest() ? 'ulasimarsiv' : $actor->username;
 
         // 2. Klasör yollarını ayarla
         // Not: public_path fonksiyonunun çalıştığından emin olmak için Flarum'un helper'ını kullanıyoruz.
@@ -24,10 +24,10 @@ class GetWatermarksController implements RequestHandlerInterface
         $basePath = public_path('assets/watermarks');
         $userPath = $basePath . '/' . $targetUser;
 
-        // Güvenlik ve Kontrol: Eğer kullanıcının adına özel klasör yoksa, 'ulasiminfo' klasörüne düş
+        // Güvenlik ve Kontrol: Eğer kullanıcının adına özel klasör yoksa, 'ulasimarsiv' klasörüne düş
         if (!is_dir($userPath)) {
-            $targetUser = 'ulasiminfo';
-            $userPath = $basePath . '/ulasiminfo';
+            $targetUser = 'ulasimarsiv';
+            $userPath = $basePath . '/ulasimarsiv';
         }
 
         // Web üzerinden erişilecek URL kökü

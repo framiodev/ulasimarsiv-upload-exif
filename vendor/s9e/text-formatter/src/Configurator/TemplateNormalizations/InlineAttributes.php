@@ -2,13 +2,13 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\TemplateNormalizations;
 
-use DOMElement;
-use DOMText;
+use s9e\SweetDOM\Element;
+use s9e\SweetDOM\Text;
 
 /**
 * Inline the xsl:attribute declarations of a template
@@ -23,17 +23,17 @@ class InlineAttributes extends AbstractNormalization
 	/**
 	* {@inheritdoc}
 	*/
-	protected $queries = ['//*[namespace-uri() != $XSL]/xsl:attribute'];
+	protected array $queries = ['//*[namespace-uri() != "' . self::XMLNS_XSL . '"]/xsl:attribute'];
 
 	/**
 	* {@inheritdoc}
 	*/
-	protected function normalizeElement(DOMElement $element)
+	protected function normalizeElement(Element $element): void
 	{
 		$value = '';
 		foreach ($element->childNodes as $node)
 		{
-			if ($node instanceof DOMText || $this->isXsl($node, 'text'))
+			if ($node instanceof Text || $this->isXsl($node, 'text'))
 			{
 				$value .= preg_replace('([{}])', '$0$0', $node->textContent);
 			}
@@ -48,6 +48,6 @@ class InlineAttributes extends AbstractNormalization
 			}
 		}
 		$element->parentNode->setAttribute($element->getAttribute('name'), $value);
-		$element->parentNode->removeChild($element);
+		$element->remove();
 	}
 }

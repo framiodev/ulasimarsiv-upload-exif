@@ -10,6 +10,10 @@ import ChangeEmailModal from './ChangeEmailModal';
 import listItems from '../../common/helpers/listItems';
 import extractText from '../../common/utils/extractText';
 import type Mithril from 'mithril';
+import classList from '../../common/utils/classList';
+import ThemeMode from '../../common/components/ThemeMode';
+import { camelCaseToSnakeCase } from '../../common/utils/string';
+import { ComponentAttrs } from '../../common/Component';
 
 /**
  * The `SettingsPage` component displays the user's settings control panel, in
@@ -17,6 +21,8 @@ import type Mithril from 'mithril';
  */
 export default class SettingsPage<CustomAttrs extends IUserPageAttrs = IUserPageAttrs> extends UserPage<CustomAttrs> {
   discloseOnlineLoading?: boolean;
+  colorSchemeLoading?: boolean;
+  hapticFeedbackLoading?: boolean;
 
   oninit(vnode: Mithril.Vnode<CustomAttrs, this>) {
     super.oninit(vnode);
@@ -34,18 +40,36 @@ export default class SettingsPage<CustomAttrs extends IUserPageAttrs = IUserPage
     );
   }
 
+  sectionProps(): Record<string, ComponentAttrs> {
+    return {
+      account: { className: 'FieldSet--col' },
+      colorScheme: {
+        className: 'FieldSet--col',
+        visible: () => app.allowUserColorScheme,
+      },
+    };
+  }
+
   /**
    * Build an item list for the user's settings controls.
    */
   settingsItems() {
     const items = new ItemList<Mithril.Children>();
 
-    ['account', 'notifications', 'privacy'].forEach((section, index) => {
-      const sectionItems = `${section}Items` as 'accountItems' | 'notificationsItems' | 'privacyItems';
+    ['account', 'notifications', 'privacy', 'device', 'colorScheme'].forEach((section, index) => {
+      const sectionItems = `${section}Items` as 'accountItems' | 'notificationsItems' | 'privacyItems' | 'deviceItems';
+
+      const { className, visible, ...props } = this.sectionProps()[section] || {};
+
+      if (visible && visible() === false) return;
 
       items.add(
         section,
-        <FieldSet className={`Settings-${section}`} label={app.translator.trans(`core.forum.settings.${section}_heading`)}>
+        <FieldSet
+          className={classList(`Settings-${section} FieldSet--min`, className || '')}
+          label={app.translator.trans(`core.forum.settings.${camelCaseToSnakeCase(section)}_heading`)}
+          {...props}
+        >
           {this[sectionItems]().toArray()}
         </FieldSet>,
         100 - index * 10
@@ -115,6 +139,66 @@ export default class SettingsPage<CustomAttrs extends IUserPageAttrs = IUserPage
       </Switch>,
       100
     );
+
+    return items;
+  }
+
+  /**
+   * Build an item list for the user's device settings.
+   */
+  deviceItems() {
+    const items = new ItemList<Mithril.Children>();
+
+    items.add(
+      'hapticFeedback',
+      <Switch
+        state={this.user!.preferences()?.hapticFeedback}
+        onchange={(value: boolean) => {
+          this.hapticFeedbackLoading = true;
+
+          this.user!.savePreferences({ hapticFeedback: value }).then(() => {
+            this.hapticFeedbackLoading = false;
+            m.redraw();
+          });
+        }}
+        loading={this.hapticFeedbackLoading}
+      >
+        {app.translator.trans('core.forum.settings.haptic_feedback_label')}
+        <span className="helpText">{app.translator.trans('core.forum.settings.haptic_feedback_help')}</span>
+      </Switch>,
+      100
+    );
+
+    return items;
+  }
+
+  /**
+   * Color schemes.
+   */
+  colorSchemeItems() {
+    const items = new ItemList<Mithril.Children>();
+
+    ThemeMode.colorSchemes.forEach((mode) => {
+      items.add(
+        mode.id,
+        <ThemeMode
+          mode={mode.id}
+          label={mode.label || app.translator.trans('core.forum.settings.color_schemes.' + mode.id.replace('-', '_') + '_mode_label')}
+          selected={this.user!.preferences()?.colorScheme === mode.id}
+          loading={this.colorSchemeLoading}
+          onclick={() => {
+            this.colorSchemeLoading = true;
+
+            this.user!.savePreferences({ colorScheme: mode.id }).then(() => {
+              this.colorSchemeLoading = false;
+              app.setColorScheme(mode.id);
+              m.redraw();
+            });
+          }}
+        />,
+        100
+      );
+    });
 
     return items;
   }

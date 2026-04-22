@@ -1,6 +1,6 @@
 import Component, { ComponentAttrs } from '../Component';
-import type Mithril from 'mithril';
 import ItemList from '../utils/ItemList';
+import type Mithril from 'mithril';
 export interface IIPAddressAttrs extends ComponentAttrs {
     ip: string | undefined | null;
 }
@@ -11,7 +11,7 @@ export interface IIPAddressAttrs extends ComponentAttrs {
  * @example
  * <IPAddress ip="127.0.0.1" />
  * @example
- * <IPAddress ip={post.data.attributes.ipAddress} />
+ * <IPAddress ip={post.ipAddress()} />
  */
 export default class IPAddress<CustomAttrs extends IIPAddressAttrs = IIPAddressAttrs> extends Component<CustomAttrs> {
     ip: string;

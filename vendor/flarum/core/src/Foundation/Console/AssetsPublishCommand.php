@@ -14,52 +14,32 @@ use Flarum\Extension\ExtensionManager;
 use Flarum\Foundation\Paths;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Filesystem\Filesystem;
+use Symfony\Component\Console\Command\Command;
 
 class AssetsPublishCommand extends AbstractCommand
 {
-    /**
-     * @var Container
-     */
-    protected $container;
-
-    /**
-     * @var Paths
-     */
-    protected $paths;
-
-    /**
-     * @param Container $container
-     * @param Paths $paths
-     */
-    public function __construct(Container $container, Paths $paths)
-    {
-        $this->container = $container;
-        $this->paths = $paths;
-
+    public function __construct(
+        protected Container $container,
+        protected Paths $paths
+    ) {
         parent::__construct();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('assets:publish')
             ->setDescription('Publish core and extension assets.');
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function fire()
+    protected function fire(): int
     {
         $this->info('Publishing core assets...');
 
         $target = $this->container->make('filesystem')->disk('flarum-assets');
         $local = new Filesystem();
 
-        $pathPrefix = $this->paths->vendor.'/components/font-awesome/webfonts';
+        $pathPrefix = $this->paths->vendor.'/fortawesome/font-awesome/webfonts';
         $assetFiles = $local->allFiles($pathPrefix);
 
         foreach ($assetFiles as $fullPath) {
@@ -78,5 +58,7 @@ class AssetsPublishCommand extends AbstractCommand
                 $extension->copyAssetsTo($target);
             }
         }
+
+        return Command::SUCCESS;
     }
 }

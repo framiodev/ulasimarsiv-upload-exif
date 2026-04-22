@@ -15,41 +15,28 @@ use Flarum\Foundation\ContainerUtil;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Arr;
 
+/**
+ * @template M of AbstractModel
+ */
 class Model implements ExtenderInterface
 {
-    private $modelClass;
-    private $customRelations = [];
-    private $casts = [];
+    private array $customRelations = [];
+    private array $casts = [];
 
     /**
-     * @param string $modelClass: The ::class attribute of the model you are modifying.
+     * @param class-string<AbstractModel> $modelClass: The ::class attribute of the model you are modifying.
      *                           This model should extend from \Flarum\Database\AbstractModel.
      */
-    public function __construct(string $modelClass)
-    {
-        $this->modelClass = $modelClass;
-    }
-
-    /**
-     * Add an attribute to be treated as a date.
-     *
-     * @param string $attribute
-     * @return self
-     * @deprecated use `cast` instead. Will be removed in v2.
-     */
-    public function dateAttribute(string $attribute): self
-    {
-        $this->cast($attribute, 'datetime');
-
-        return $this;
+    public function __construct(
+        private readonly string $modelClass
+    ) {
     }
 
     /**
      * Add a custom attribute type cast. Should not be applied to non-extension attributes.
      *
      * @param string $attribute: The new attribute name.
-     * @param string $cast: The cast type. See https://laravel.com/docs/8.x/eloquent-mutators#attribute-casting
-     * @return self
+     * @param string $cast: The cast type. See https://laravel.com/docs/11.x/eloquent-mutators#attribute-casting
      */
     public function cast(string $attribute, string $cast): self
     {
@@ -62,12 +49,8 @@ class Model implements ExtenderInterface
      * Add a default value for a given attribute, which can be an explicit value, a closure,
      * or an instance of an invokable class. Unlike with some other extenders,
      * it CANNOT be the `::class` attribute of an invokable class.
-     *
-     * @param string $attribute
-     * @param mixed $value
-     * @return self
      */
-    public function default(string $attribute, $value): self
+    public function default(string $attribute, mixed $value): self
     {
         Arr::set(AbstractModel::$defaults, "$this->modelClass.$attribute", $value);
 
@@ -83,11 +66,10 @@ class Model implements ExtenderInterface
      *                      but has to be unique from other relation names for this model, and should
      *                      work as the name of a method.
      * @param string $related: The ::class attribute of the model, which should extend \Flarum\Database\AbstractModel.
-     * @param string $foreignKey: The foreign key attribute of the parent model.
-     * @param string $ownerKey: The primary key attribute of the parent model.
-     * @return self
+     * @param string|null $foreignKey: The foreign key attribute of the parent model.
+     * @param string|null $ownerKey: The primary key attribute of the parent model.
      */
-    public function belongsTo(string $name, string $related, string $foreignKey = null, string $ownerKey = null): self
+    public function belongsTo(string $name, string $related, ?string $foreignKey = null, ?string $ownerKey = null): self
     {
         return $this->relationship($name, function (AbstractModel $model) use ($related, $foreignKey, $ownerKey, $name) {
             return $model->belongsTo($related, $foreignKey, $ownerKey, $name);
@@ -103,21 +85,20 @@ class Model implements ExtenderInterface
      *                      but has to be unique from other relation names for this model, and should
      *                      work as the name of a method.
      * @param string $related: The ::class attribute of the model, which should extend \Flarum\Database\AbstractModel.
-     * @param string $table: The intermediate table for this relation
-     * @param string $foreignPivotKey: The foreign key attribute of the parent model.
-     * @param string $relatedPivotKey: The associated key attribute of the relation.
-     * @param string $parentKey: The key name of the parent model.
-     * @param string $relatedKey: The key name of the related model.
-     * @return self
+     * @param string|null $table: The intermediate table for this relation
+     * @param string|null $foreignPivotKey: The foreign key attribute of the parent model.
+     * @param string|null $relatedPivotKey: The associated key attribute of the relation.
+     * @param string|null $parentKey: The key name of the parent model.
+     * @param string|null $relatedKey: The key name of the related model.
      */
     public function belongsToMany(
         string $name,
         string $related,
-        string $table = null,
-        string $foreignPivotKey = null,
-        string $relatedPivotKey = null,
-        string $parentKey = null,
-        string $relatedKey = null
+        ?string $table = null,
+        ?string $foreignPivotKey = null,
+        ?string $relatedPivotKey = null,
+        ?string $parentKey = null,
+        ?string $relatedKey = null
     ): self {
         return $this->relationship($name, function (AbstractModel $model) use ($related, $table, $foreignPivotKey, $relatedPivotKey, $parentKey, $relatedKey, $name) {
             return $model->belongsToMany($related, $table, $foreignPivotKey, $relatedPivotKey, $parentKey, $relatedKey, $name);
@@ -133,11 +114,10 @@ class Model implements ExtenderInterface
      *                      but has to be unique from other relation names for this model, and should
      *                      work as the name of a method.
      * @param string $related: The ::class attribute of the model, which should extend \Flarum\Database\AbstractModel.
-     * @param string $foreignKey: The foreign key attribute of the parent model.
-     * @param string $localKey: The primary key attribute of the parent model.
-     * @return self
+     * @param string|null $foreignKey: The foreign key attribute of the parent model.
+     * @param string|null $localKey: The primary key attribute of the parent model.
      */
-    public function hasOne(string $name, string $related, string $foreignKey = null, string $localKey = null): self
+    public function hasOne(string $name, string $related, ?string $foreignKey = null, ?string $localKey = null): self
     {
         return $this->relationship($name, function (AbstractModel $model) use ($related, $foreignKey, $localKey) {
             return $model->hasOne($related, $foreignKey, $localKey);
@@ -153,11 +133,10 @@ class Model implements ExtenderInterface
      *                      but has to be unique from other relation names for this model, and should
      *                      work as the name of a method.
      * @param string $related: The ::class attribute of the model, which should extend \Flarum\Database\AbstractModel.
-     * @param string $foreignKey: The foreign key attribute of the parent model.
-     * @param string $localKey: The primary key attribute of the parent model.
-     * @return self
+     * @param string|null $foreignKey: The foreign key attribute of the parent model.
+     * @param string|null $localKey: The primary key attribute of the parent model.
      */
-    public function hasMany(string $name, string $related, string $foreignKey = null, string $localKey = null): self
+    public function hasMany(string $name, string $related, ?string $foreignKey = null, ?string $localKey = null): self
     {
         return $this->relationship($name, function (AbstractModel $model) use ($related, $foreignKey, $localKey) {
             return $model->hasMany($related, $foreignKey, $localKey);
@@ -170,7 +149,7 @@ class Model implements ExtenderInterface
      * @param string $name: The name of the relation. This doesn't have to be anything in particular,
      *                      but has to be unique from other relation names for this model, and should
      *                      work as the name of a method.
-     * @param callable|string $callback
+     * @param callable|class-string $callback
      *
      * The callable can be a closure or invokable class, and should accept:
      * - $instance: An instance of this model.
@@ -178,20 +157,20 @@ class Model implements ExtenderInterface
      * The callable should return:
      * - $relationship: A Laravel Relationship object. See relevant methods of models
      *                  like \Flarum\User\User for examples of how relationships should be returned.
-     *
-     * @return self
      */
-    public function relationship(string $name, $callback): self
+    public function relationship(string $name, callable|string $callback): self
     {
         $this->customRelations[$name] = $callback;
 
         return $this;
     }
 
-    public function extend(Container $container, Extension $extension = null)
+    public function extend(Container $container, ?Extension $extension = null): void
     {
         foreach ($this->customRelations as $name => $callback) {
-            Arr::set(AbstractModel::$customRelations, "$this->modelClass.$name", ContainerUtil::wrapCallback($callback, $container));
+            /** @var class-string<AbstractModel> $modelClass */
+            $modelClass = $this->modelClass;
+            $modelClass::resolveRelationUsing($name, ContainerUtil::wrapCallback($callback, $container));
         }
 
         Arr::set(

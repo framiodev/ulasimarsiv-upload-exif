@@ -1,14 +1,16 @@
 // ------------------------------------
 // Stream
 
-.PostStream {
-  @media @tablet-up {
-    margin-top: 10px;
-  }
-}
 .PostStream-item {
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--control-bg);
+  &:has( + .PostStream-item) {
+    &::after {
+      content: "";
+      display: block;
+      width: calc(~"100% - var(--post-padding)");
+      height: 1px;
+      background-color: var(--control-bg);
+      margin-right: auto;
+    }
 
     @media @phone {
       margin: 0 -15px;
@@ -48,12 +50,12 @@
   text-transform: uppercase;
   font-weight: bold;
   color: var(--muted-color);
-  padding: 20px 20px 20px @avatar-column-width;
+  padding: 20px 20px 20px var(--avatar-column-width);
   font-size: 12px;
 
   @media @phone {
-    margin: 0 -15px;
-    padding: 20px 15px;
+    margin: 0;
+    padding: 20px 0;
   }
 }
 

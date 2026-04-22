@@ -19,28 +19,7 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
         $route->toController(Controller\ShowForumController::class)
     );
 
-    // List access tokens
-    $map->get(
-        '/access-tokens',
-        'access-tokens.index',
-        $route->toController(Controller\ListAccessTokensController::class)
-    );
-
-    // List access tokens
-    $map->post(
-        '/access-tokens',
-        'access-tokens.create',
-        $route->toController(Controller\CreateAccessTokenController::class)
-    );
-
-    // List access tokens
-    $map->delete(
-        '/access-tokens/{id}',
-        'access-tokens.delete',
-        $route->toController(Controller\DeleteAccessTokenController::class)
-    );
-
-    // Retrieve authentication token
+    // Create authentication token
     $map->post(
         '/token',
         'token',
@@ -52,6 +31,13 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
         '/sessions',
         'sessions.delete',
         $route->toController(Controller\TerminateAllOtherSessionsController::class)
+    );
+
+    // Resolve a registration token (returns username/email/provided for pre-populating sign-up modal)
+    $map->post(
+        '/registration-token',
+        'registration-token',
+        $route->toController(Controller\ResolveRegistrationTokenController::class)
     );
 
     // Send forgot password email
@@ -67,55 +53,6 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
     |--------------------------------------------------------------------------
     */
 
-    // List users
-    $map->get(
-        '/users',
-        'users.index',
-        $route->toController(Controller\ListUsersController::class)
-    );
-
-    // Register a user
-    $map->post(
-        '/users',
-        'users.create',
-        $route->toController(Controller\CreateUserController::class)
-    );
-
-    // Get a single user
-    $map->get(
-        '/users/{id}',
-        'users.show',
-        $route->toController(Controller\ShowUserController::class)
-    );
-
-    // Edit a user
-    $map->patch(
-        '/users/{id}',
-        'users.update',
-        $route->toController(Controller\UpdateUserController::class)
-    );
-
-    // Delete a user
-    $map->delete(
-        '/users/{id}',
-        'users.delete',
-        $route->toController(Controller\DeleteUserController::class)
-    );
-
-    // Upload avatar
-    $map->post(
-        '/users/{id}/avatar',
-        'users.avatar.upload',
-        $route->toController(Controller\UploadAvatarController::class)
-    );
-
-    // Remove avatar
-    $map->delete(
-        '/users/{id}/avatar',
-        'users.avatar.delete',
-        $route->toController(Controller\DeleteAvatarController::class)
-    );
-
     // send confirmation email
     $map->post(
         '/users/{id}/send-confirmation',
@@ -125,16 +62,22 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
 
     /*
     |--------------------------------------------------------------------------
-    | Notifications
+    | Groups
     |--------------------------------------------------------------------------
     */
 
-    // List notifications for the current user
-    $map->get(
-        '/notifications',
-        'notifications.index',
-        $route->toController(Controller\ListNotificationsController::class)
+    // Change order of groups
+    $map->post(
+        '/groups/order',
+        'groups.order',
+        $route->toController(Controller\OrderGroupsController::class)
     );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    */
 
     // Mark all notifications as read
     $map->post(
@@ -143,141 +86,11 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
         $route->toController(Controller\ReadAllNotificationsController::class)
     );
 
-    // Mark a single notification as read
-    $map->patch(
-        '/notifications/{id}',
-        'notifications.update',
-        $route->toController(Controller\UpdateNotificationController::class)
-    );
-
     // Delete all notifications for the current user.
     $map->delete(
         '/notifications',
         'notifications.deleteAll',
         $route->toController(Controller\DeleteAllNotificationsController::class)
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Discussions
-    |--------------------------------------------------------------------------
-    */
-
-    // List discussions
-    $map->get(
-        '/discussions',
-        'discussions.index',
-        $route->toController(Controller\ListDiscussionsController::class)
-    );
-
-    // Create a discussion
-    $map->post(
-        '/discussions',
-        'discussions.create',
-        $route->toController(Controller\CreateDiscussionController::class)
-    );
-
-    // Show a single discussion
-    $map->get(
-        '/discussions/{id}',
-        'discussions.show',
-        $route->toController(Controller\ShowDiscussionController::class)
-    );
-
-    // Edit a discussion
-    $map->patch(
-        '/discussions/{id}',
-        'discussions.update',
-        $route->toController(Controller\UpdateDiscussionController::class)
-    );
-
-    // Delete a discussion
-    $map->delete(
-        '/discussions/{id}',
-        'discussions.delete',
-        $route->toController(Controller\DeleteDiscussionController::class)
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Posts
-    |--------------------------------------------------------------------------
-    */
-
-    // List posts, usually for a discussion
-    $map->get(
-        '/posts',
-        'posts.index',
-        $route->toController(Controller\ListPostsController::class)
-    );
-
-    // Create a post
-    $map->post(
-        '/posts',
-        'posts.create',
-        $route->toController(Controller\CreatePostController::class)
-    );
-
-    // Show a single or multiple posts by ID
-    $map->get(
-        '/posts/{id}',
-        'posts.show',
-        $route->toController(Controller\ShowPostController::class)
-    );
-
-    // Edit a post
-    $map->patch(
-        '/posts/{id}',
-        'posts.update',
-        $route->toController(Controller\UpdatePostController::class)
-    );
-
-    // Delete a post
-    $map->delete(
-        '/posts/{id}',
-        'posts.delete',
-        $route->toController(Controller\DeletePostController::class)
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Groups
-    |--------------------------------------------------------------------------
-    */
-
-    // List groups
-    $map->get(
-        '/groups',
-        'groups.index',
-        $route->toController(Controller\ListGroupsController::class)
-    );
-
-    // Create a group
-    $map->post(
-        '/groups',
-        'groups.create',
-        $route->toController(Controller\CreateGroupController::class)
-    );
-
-    // Show a single group
-    $map->get(
-        '/groups/{id}',
-        'groups.show',
-        $route->toController(Controller\ShowGroupController::class)
-    );
-
-    // Edit a group
-    $map->patch(
-        '/groups/{id}',
-        'groups.update',
-        $route->toController(Controller\UpdateGroupController::class)
-    );
-
-    // Delete a group
-    $map->delete(
-        '/groups/{id}',
-        'groups.delete',
-        $route->toController(Controller\DeleteGroupController::class)
     );
 
     /*
@@ -300,11 +113,11 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
         $route->toController(Controller\UninstallExtensionController::class)
     );
 
-    // Get readme for an extension
-    $map->get(
-        '/extension-readmes/{name}',
-        'extension-readmes.show',
-        $route->toController(Controller\ShowExtensionReadmeController::class)
+    // Extension bisect
+    $map->post(
+        '/extension-bisect',
+        'extension-bisect',
+        $route->toController(Controller\ExtensionBisectController::class)
     );
 
     // Update settings
@@ -312,6 +125,13 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
         '/settings',
         'settings',
         $route->toController(Controller\SetSettingsController::class)
+    );
+
+    // Delete settings (reset to defaults)
+    $map->delete(
+        '/settings',
+        'settings.delete',
+        $route->toController(Controller\DeleteSettingsController::class)
     );
 
     // Update a permission
@@ -335,6 +155,20 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
         $route->toController(Controller\DeleteLogoController::class)
     );
 
+    // Upload a dark mode logo
+    $map->post(
+        '/logo-dark-mode',
+        'logo-dark-mode',
+        $route->toController(Controller\UploadLogoDarkModeController::class)
+    );
+
+    // Remove the dark mode logo
+    $map->delete(
+        '/logo-dark-mode',
+        'logo-dark-mode.delete',
+        $route->toController(Controller\DeleteLogoDarkModeController::class)
+    );
+
     // Upload a favicon
     $map->post(
         '/favicon',
@@ -354,13 +188,6 @@ return function (RouteCollection $map, RouteHandlerFactory $route) {
         '/cache',
         'cache.clear',
         $route->toController(Controller\ClearCacheController::class)
-    );
-
-    // Get system info
-    $map->get(
-        '/info',
-        'info.show',
-        $route->toController(Controller\ShowInfoController::class)
     );
 
     // List available mail drivers, available fields and validation status

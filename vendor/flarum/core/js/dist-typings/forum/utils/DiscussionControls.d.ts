@@ -1,4 +1,5 @@
-declare namespace _default {
+export default DiscussionControls;
+declare namespace DiscussionControls {
     /**
      * Get a list of controls for a discussion.
      *
@@ -48,9 +49,9 @@ declare namespace _default {
      * @param {boolean} goToLast Whether or not to scroll down to the last post if the discussion is being viewed.
      * @param {boolean} forceRefresh Whether or not to force a reload of the composer component, even if it is already open for this discussion.
      *
-     * @return {Promise<void>}
+     * @return {Promise<import('../states/ComposerState.js')>}
      */
-    function replyAction(goToLast: boolean, forceRefresh: boolean): Promise<void>;
+    function replyAction(goToLast: boolean, forceRefresh: boolean): Promise<typeof import("../states/ComposerState.js")>;
     /**
      * Hide a discussion.
      *
@@ -74,5 +75,4 @@ declare namespace _default {
      */
     function renameAction(): any;
 }
-export default _default;
 import ItemList from "../../common/utils/ItemList";

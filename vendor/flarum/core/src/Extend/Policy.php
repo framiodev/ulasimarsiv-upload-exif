@@ -15,14 +15,13 @@ use Illuminate\Contracts\Container\Container;
 
 class Policy implements ExtenderInterface
 {
-    private $globalPolicies = [];
-    private $modelPolicies = [];
+    private array $globalPolicies = [];
+    private array $modelPolicies = [];
 
     /**
      * Add a custom policy for when an ability check is ran without a model instance.
      *
-     * @param string $policy: ::class attribute of policy class, which must extend Flarum\User\Access\AbstractPolicy
-     * @return self
+     * @param class-string<AbstractPolicy> $policy: ::class attribute of policy class, which must extend \Flarum\User\Access\AbstractPolicy
      */
     public function globalPolicy(string $policy): self
     {
@@ -37,7 +36,6 @@ class Policy implements ExtenderInterface
      * @param string $modelClass: The ::class attribute of the model you are applying policies to.
      *                           This model should extend from \Flarum\Database\AbstractModel.
      * @param string $policy: ::class attribute of policy class, which must extend Flarum\User\Access\AbstractPolicy
-     * @return self
      */
     public function modelPolicy(string $modelClass, string $policy): self
     {
@@ -50,7 +48,7 @@ class Policy implements ExtenderInterface
         return $this;
     }
 
-    public function extend(Container $container, Extension $extension = null)
+    public function extend(Container $container, ?Extension $extension = null): void
     {
         $container->extend('flarum.policies', function ($existingPolicies) {
             foreach ($this->modelPolicies as $modelClass => $addPolicies) {

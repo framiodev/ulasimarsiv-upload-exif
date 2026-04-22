@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\Helpers\TemplateParser;
@@ -55,7 +55,7 @@ abstract class IRProcessor
 	* @param  DOMNode $node Context node
 	* @return mixed
 	*/
-	protected function evaluate($expr, DOMNode $node = null)
+	protected function evaluate($expr, ?DOMNode $node = null)
 	{
 		return (isset($node)) ? $this->xpath->evaluate($expr, $node) : $this->xpath->evaluate($expr);
 	}
@@ -67,7 +67,7 @@ abstract class IRProcessor
 	* @param  DOMNode      $node  Context node
 	* @return \DOMNodeList
 	*/
-	protected function query($query, DOMNode $node = null)
+	protected function query($query, ?DOMNode $node = null)
 	{
 		return (isset($node)) ? $this->xpath->query($query, $node) : $this->xpath->query($query);
 	}

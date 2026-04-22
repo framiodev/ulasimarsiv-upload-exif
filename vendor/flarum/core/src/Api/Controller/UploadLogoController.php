@@ -9,39 +9,36 @@
 
 namespace Flarum\Api\Controller;
 
-use Flarum\Settings\SettingsRepositoryInterface;
-use Illuminate\Contracts\Filesystem\Factory;
-use Intervention\Image\Image;
-use Intervention\Image\ImageManager;
+use Flarum\Admin\LogoValidator;
+use Intervention\Image\Interfaces\EncodedImageInterface;
+use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\UploadedFileInterface;
 
 class UploadLogoController extends UploadImageController
 {
-    protected $filePathSettingKey = 'logo_path';
+    protected string $filePathSettingKey = 'logo_path';
+    protected string $filenamePrefix = 'logo';
+    private string $resolvedExtension = 'webp';
+    protected ?string $validator = LogoValidator::class;
 
-    protected $filenamePrefix = 'logo';
-
-    /**
-     * @var ImageManager
-     */
-    protected $imageManager;
-
-    public function __construct(SettingsRepositoryInterface $settings, Factory $filesystemFactory, ImageManager $imageManager)
+    protected function makeImage(UploadedFileInterface $file): EncodedImageInterface
     {
-        parent::__construct($settings, $filesystemFactory);
+        $image = $this->imageManager->read($file->getStream()->getMetadata('uri'))
+            ->scale(height: 60);
 
-        $this->imageManager = $imageManager;
+        if ($image->isAnimated()) {
+            $this->resolvedExtension = 'gif';
+
+            return $image->toGif();
+        }
+
+        $this->resolvedExtension = 'webp';
+
+        return $image->toWebp();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function makeImage(UploadedFileInterface $file): Image
+    protected function fileExtension(ServerRequestInterface $request, UploadedFileInterface $file): string
     {
-        $encodedImage = $this->imageManager->make($file->getStream()->getMetadata('uri'))->heighten(60, function ($constraint) {
-            $constraint->upsize();
-        })->encode('png');
-
-        return $encodedImage;
+        return $this->resolvedExtension;
     }
 }

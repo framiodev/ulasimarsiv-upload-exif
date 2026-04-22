@@ -19,30 +19,23 @@ use Throwable;
  * of it, map them to error "types" and how to determine appropriate HTTP status
  * codes for them.
  */
-class Registry
+readonly class Registry
 {
-    private $statusMap;
-    private $classMap;
-    private $handlerMap;
-
-    public function __construct(array $statusMap, array $classMap, array $handlerMap)
-    {
-        $this->statusMap = $statusMap;
-        $this->classMap = $classMap;
-        $this->handlerMap = $handlerMap;
+    public function __construct(
+        private array $statusMap,
+        private array $classMap,
+        private array $handlerMap
+    ) {
     }
 
     /**
      * Map exceptions to handled errors.
      *
-     * This can map internal ({@see \Flarum\Foundation\KnownError}) as well as
+     * This can map internal ({@see KnownError}) as well as
      * external exceptions (any classes inheriting from \Throwable) to instances
-     * of {@see \Flarum\Foundation\ErrorHandling\HandledError}.
+     * of {@see HandledError}.
      *
      * Even for unknown exceptions, a generic fallback will always be returned.
-     *
-     * @param Throwable $error
-     * @return HandledError
      */
     public function handle(Throwable $error): HandledError
     {
@@ -58,7 +51,7 @@ class Registry
         if ($error instanceof KnownError) {
             $errorType = $error->getType();
         } else {
-            $errorClass = get_class($error);
+            $errorClass = $error::class;
             if (isset($this->classMap[$errorClass])) {
                 $errorType = $this->classMap[$errorClass];
             }
@@ -77,12 +70,12 @@ class Registry
 
     private function handleCustomTypes(Throwable $error): ?HandledError
     {
-        $errorClass = get_class($error);
+        foreach ($this->handlerMap as $class => $handler) {
+            if (is_a($error, $class)) {
+                $handler = new $handler;
 
-        if (isset($this->handlerMap[$errorClass])) {
-            $handler = new $this->handlerMap[$errorClass];
-
-            return $handler->handle($error);
+                return $handler->handle($error);
+            }
         }
 
         return null;

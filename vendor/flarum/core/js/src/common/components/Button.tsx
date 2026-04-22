@@ -1,18 +1,20 @@
 import type Mithril from 'mithril';
 import Component, { ComponentAttrs } from '../Component';
 import fireDebugWarning from '../helpers/fireDebugWarning';
-import icon from '../helpers/icon';
 import classList from '../utils/classList';
 import extractText from '../utils/extractText';
 import LoadingIndicator from './LoadingIndicator';
+import Icon from './Icon';
 
 export interface IButtonAttrs extends ComponentAttrs {
   /**
    * Class(es) of an optional icon to be rendered within the button.
    *
    * If provided, the button will gain a `has-icon` class.
+   *
+   * You may also provide a rendered icon element directly.
    */
-  icon?: string;
+  icon?: string | boolean | Mithril.Children;
   /**
    * Disables button from user input.
    *
@@ -28,18 +30,6 @@ export interface IButtonAttrs extends ComponentAttrs {
    */
   loading?: boolean;
   /**
-   * **DEPRECATED:** Please use the `aria-label` attribute instead. For tooltips, use
-   * the `<Tooltip>` component.
-   *
-   * Accessible text for the button. This should always be present if the button only
-   * contains an icon.
-   *
-   * The textual content of this attribute is passed to the DOM element as `aria-label`.
-   *
-   * @deprecated
-   */
-  title?: string | Mithril.ChildArray;
-  /**
    * Accessible text for the button. This should always be present if the button only
    * contains an icon.
    *
@@ -54,6 +44,12 @@ export interface IButtonAttrs extends ComponentAttrs {
    * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/button#attr-type
    */
   type?: string;
+  /**
+   * Helper text. Displayed under the button label.
+   *
+   * Default: `null`
+   */
+  helperText?: Mithril.Children;
 }
 
 /**
@@ -68,13 +64,10 @@ export interface IButtonAttrs extends ComponentAttrs {
  */
 export default class Button<CustomAttrs extends IButtonAttrs = IButtonAttrs> extends Component<CustomAttrs> {
   view(vnode: Mithril.VnodeDOM<CustomAttrs, this>) {
-    let { type, title, 'aria-label': ariaLabel, icon: iconName, disabled, loading, className, class: _class, ...attrs } = this.attrs;
+    let { type, 'aria-label': ariaLabel, icon: iconName, disabled, loading, className, class: _class, helperText, ...attrs } = this.attrs;
 
     // If no `type` attr provided, set to "button"
     type ||= 'button';
-
-    // Use `title` attribute as `aria-label` if none provided
-    ariaLabel ||= title;
 
     // If given a translation object, extract the text.
     if (typeof ariaLabel === 'object') {
@@ -89,6 +82,7 @@ export default class Button<CustomAttrs extends IButtonAttrs = IButtonAttrs> ext
       hasIcon: iconName,
       disabled: disabled || loading,
       loading: loading,
+      hasSubContent: !!this.getButtonSubContent(),
     });
 
     const buttonAttrs = {
@@ -119,12 +113,21 @@ export default class Button<CustomAttrs extends IButtonAttrs = IButtonAttrs> ext
    * Get the template for the button's content.
    */
   protected getButtonContent(children: Mithril.Children): Mithril.ChildArray {
-    const iconName = this.attrs.icon;
+    const icon = this.attrs.icon;
 
     return [
-      iconName && icon(iconName, { className: 'Button-icon' }),
-      children && <span className="Button-label">{children}</span>,
+      icon && (typeof icon === 'string' || icon === true ? <Icon name={icon} className="Button-icon" /> : icon),
+      children && (
+        <span className="Button-label">
+          <span className="Button-labelText">{children}</span>
+          {this.getButtonSubContent()}
+        </span>
+      ),
       this.attrs.loading && <LoadingIndicator size="small" display="inline" />,
     ];
+  }
+
+  protected getButtonSubContent(): Mithril.Children {
+    return this.attrs.helperText ? <span className="Button-helperText">{this.attrs.helperText}</span> : null;
   }
 }

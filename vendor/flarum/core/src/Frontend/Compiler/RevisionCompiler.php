@@ -9,8 +9,11 @@
 
 namespace Flarum\Frontend\Compiler;
 
-use Flarum\Frontend\Compiler\Source\SourceCollector;
+use Flarum\Frontend\Compiler\Concerns\HasSources;
+use Flarum\Frontend\Compiler\Source\FileSource;
 use Flarum\Frontend\Compiler\Source\SourceInterface;
+use Flarum\Frontend\Compiler\Source\StringSource;
+use Flarum\Settings\SettingsRepositoryInterface;
 use Illuminate\Contracts\Filesystem\Cloud;
 
 /**
@@ -18,38 +21,18 @@ use Illuminate\Contracts\Filesystem\Cloud;
  */
 class RevisionCompiler implements CompilerInterface
 {
-    const EMPTY_REVISION = 'empty';
+    use HasSources;
 
-    /**
-     * @var Cloud
-     */
-    protected $assetsDir;
+    public const EMPTY_REVISION = 'empty';
 
-    /**
-     * @var VersionerInterface
-     */
-    protected $versioner;
+    protected VersionerInterface $versioner;
 
-    /**
-     * @var string
-     */
-    protected $filename;
-
-    /**
-     * @var callable[]
-     */
-    protected $sourcesCallbacks = [];
-
-    /**
-     * @param Cloud $assetsDir
-     * @param string $filename
-     * @param VersionerInterface|null $versioner @deprecated nullable will be removed at v2.0
-     */
-    public function __construct(Cloud $assetsDir, string $filename, VersionerInterface $versioner = null)
-    {
-        $this->assetsDir = $assetsDir;
-        $this->filename = $filename;
-        $this->versioner = $versioner ?: new FileVersioner($assetsDir);
+    public function __construct(
+        protected Cloud $assetsDir,
+        protected string $filename,
+        protected SettingsRepositoryInterface $settings
+    ) {
+        $this->versioner = new FileVersioner($assetsDir);
     }
 
     public function getFilename(): string
@@ -57,12 +40,12 @@ class RevisionCompiler implements CompilerInterface
         return $this->filename;
     }
 
-    public function setFilename(string $filename)
+    public function setFilename(string $filename): void
     {
         $this->filename = $filename;
     }
 
-    public function commit(bool $force = false)
+    public function commit(bool $force = false): void
     {
         $sources = $this->getSources();
 
@@ -82,25 +65,6 @@ class RevisionCompiler implements CompilerInterface
 
             $this->versioner->putRevision($this->filename, $newRevision);
         }
-    }
-
-    public function addSources(callable $callback)
-    {
-        $this->sourcesCallbacks[] = $callback;
-    }
-
-    /**
-     * @return SourceInterface[]
-     */
-    protected function getSources(): array
-    {
-        $sources = new SourceCollector;
-
-        foreach ($this->sourcesCallbacks as $callback) {
-            $callback($sources);
-        }
-
-        return $sources->getSources();
     }
 
     public function getUrl(): ?string
@@ -129,7 +93,6 @@ class RevisionCompiler implements CompilerInterface
     }
 
     /**
-     * @param string $file
      * @param SourceInterface[] $sources
      * @return bool true if the file was written, false if there was nothing to write
      */
@@ -182,7 +145,7 @@ class RevisionCompiler implements CompilerInterface
         return null;
     }
 
-    public function flush()
+    public function flush(): void
     {
         if ($this->versioner->getRevision($this->filename) !== null) {
             $this->delete($this->filename);
@@ -191,10 +154,15 @@ class RevisionCompiler implements CompilerInterface
         }
     }
 
-    protected function delete(string $file)
+    protected function delete(string $file): void
     {
         if ($this->assetsDir->exists($file)) {
             $this->assetsDir->delete($file);
         }
+    }
+
+    protected function allowedSourceTypes(): array
+    {
+        return [FileSource::class, StringSource::class];
     }
 }

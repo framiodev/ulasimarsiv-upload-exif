@@ -12,22 +12,17 @@ namespace Flarum\Install;
 use Carbon\Carbon;
 use Illuminate\Hashing\BcryptHasher;
 
-class AdminUser
+readonly class AdminUser
 {
-    private $username;
-    private $password;
-    private $email;
-
-    public function __construct($username, $password, $email)
-    {
-        $this->username = $username;
-        $this->password = $password;
-        $this->email = $email;
-
+    public function __construct(
+        private string $username,
+        #[\SensitiveParameter] private string $password,
+        private string $email
+    ) {
         $this->validate();
     }
 
-    public function getUsername()
+    public function getUsername(): string
     {
         return $this->username;
     }
@@ -43,7 +38,7 @@ class AdminUser
         ];
     }
 
-    private function validate()
+    private function validate(): void
     {
         if (! filter_var($this->email, FILTER_VALIDATE_EMAIL)) {
             throw new ValidationFailed('You must enter a valid email.');

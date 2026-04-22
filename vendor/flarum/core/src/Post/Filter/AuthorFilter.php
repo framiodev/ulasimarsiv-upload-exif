@@ -9,23 +9,24 @@
 
 namespace Flarum\Post\Filter;
 
-use Flarum\Filter\FilterInterface;
-use Flarum\Filter\FilterState;
-use Flarum\Filter\ValidateFilterTrait;
-use Flarum\User\UserRepository;
+use Flarum\Http\SlugManager;
+use Flarum\Search\Database\DatabaseSearchState;
+use Flarum\Search\Filter\FilterInterface;
+use Flarum\Search\SearchState;
+use Flarum\Search\ValidateFilterTrait;
+use Flarum\User\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
+/**
+ * @implements FilterInterface<DatabaseSearchState>
+ */
 class AuthorFilter implements FilterInterface
 {
     use ValidateFilterTrait;
 
-    /**
-     * @var \Flarum\User\UserRepository
-     */
-    protected $users;
-
-    public function __construct(UserRepository $users)
-    {
-        $this->users = $users;
+    public function __construct(
+        protected SlugManager $slugManager
+    ) {
     }
 
     public function getFilterKey(): string
@@ -33,12 +34,19 @@ class AuthorFilter implements FilterInterface
         return 'author';
     }
 
-    public function filter(FilterState $filterState, $filterValue, bool $negate)
+    public function filter(SearchState $state, string|array $value, bool $negate): void
     {
-        $usernames = $this->asStringArray($filterValue);
+        $slugDriver = $this->slugManager->forResource(User::class);
+        $ids = [];
 
-        $ids = $this->users->query()->whereIn('username', $usernames)->pluck('id');
+        foreach ($this->asStringArray($value) as $slug) {
+            try {
+                $ids[] = $slugDriver->fromSlug($slug, $state->getActor())->id;
+            } catch (ModelNotFoundException) {
+                // Slug does not match any user; skip it.
+            }
+        }
 
-        $filterState->getQuery()->whereIn('posts.user_id', $ids, 'and', $negate);
+        $state->getQuery()->whereIn('posts.user_id', $ids, 'and', $negate);
     }
 }

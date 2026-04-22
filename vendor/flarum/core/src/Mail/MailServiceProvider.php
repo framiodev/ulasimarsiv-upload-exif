@@ -11,22 +11,32 @@ namespace Flarum\Mail;
 
 use Flarum\Foundation\AbstractServiceProvider;
 use Flarum\Settings\SettingsRepositoryInterface;
+use Flarum\User\UserRepository;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Contracts\Mail\Mailer as MailerContract;
 use Illuminate\Contracts\Validation\Factory;
-use Illuminate\Mail\Mailer;
+use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Arr;
-use Swift_Mailer;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransportFactory;
+use Symfony\Component\Mailer\Transport\TransportFactoryInterface;
+use Symfony\Component\Mailer\Transport\TransportInterface;
 
 class MailServiceProvider extends AbstractServiceProvider
 {
-    public function register()
+    public function register(): void
     {
+        $this->container->bind(TransportFactoryInterface::class, EsmtpTransportFactory::class);
+
         $this->container->singleton('mail.supported_drivers', function () {
             return [
                 'mail' => SendmailDriver::class,
                 'mailgun' => MailgunDriver::class,
+                'postmark' => PostmarkDriver::class,
                 'log' => LogDriver::class,
                 'smtp' => SmtpDriver::class,
+                'null' => NullDriver::class,
             ];
         });
 
@@ -54,30 +64,43 @@ class MailServiceProvider extends AbstractServiceProvider
                 : $container->make(NullDriver::class);
         });
 
-        $this->container->singleton('swift.mailer', function (Container $container) {
-            return new Swift_Mailer(
-                $container->make('mail.driver')->buildTransport(
-                    $container->make(SettingsRepositoryInterface::class)
-                )
+        $this->container->singleton('symfony.mailer.transport', function (Container $container): TransportInterface {
+            return $container->make('mail.driver')->buildTransport(
+                $container->make(SettingsRepositoryInterface::class)
             );
         });
 
-        $this->container->singleton('mailer', function (Container $container) {
+        $this->container->singleton('mailer', function (Container $container): MailerContract {
+            $settings = $container->make(SettingsRepositoryInterface::class);
+
             $mailer = new Mailer(
                 'flarum',
                 $container['view'],
-                $container['swift.mailer'],
-                $container['events']
+                $container['symfony.mailer.transport'],
+                $container['events'],
+                $settings,
+                $container->make(LoggerInterface::class),
+                $container->make(UserRepository::class),
             );
 
             if ($container->bound('queue')) {
                 $mailer->setQueue($container->make('queue'));
             }
 
-            $settings = $container->make(SettingsRepositoryInterface::class);
             $mailer->alwaysFrom($settings->get('mail_from'), $settings->get('forum_title'));
 
             return $mailer;
         });
+
+        $this->container->alias('mailer', MailerContract::class);
+
+        $this->container->afterResolving(\Illuminate\Contracts\View\Factory::class, function (\Illuminate\Contracts\View\Factory $blade) {
+            $blade->addNamespace('mail', __DIR__.'/../../views/email');
+        });
+    }
+
+    public function boot(Dispatcher $events): void
+    {
+        $events->listen(MessageSending::class, MutateEmail::class);
     }
 }

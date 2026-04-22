@@ -2,12 +2,12 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\TemplateNormalizations;
 
-use DOMAttr;
+use s9e\SweetDOM\Attr;
 use s9e\TextFormatter\Configurator\Helpers\AVTHelper;
 use s9e\TextFormatter\Configurator\Helpers\XPathHelper;
 
@@ -16,12 +16,12 @@ class MinifyXPathExpressions extends AbstractNormalization
 	/**
 	* {@inheritdoc}
 	*/
-	protected $queries = ['//@*[contains(., " ") or contains(., ")")]'];
+	protected array $queries = ['//@*[contains(., " ") or contains(., ")")]'];
 
 	/**
 	* {@inheritdoc}
 	*/
-	protected function normalizeAttribute(DOMAttr $attribute)
+	protected function normalizeAttribute(Attr $attribute): void
 	{
 		$element = $attribute->parentNode;
 		if (!$this->isXsl($element))
@@ -39,11 +39,8 @@ class MinifyXPathExpressions extends AbstractNormalization
 
 	/**
 	* Minify XPath expressions in given attribute
-	*
-	* @param  DOMAttr $attribute
-	* @return void
 	*/
-	protected function replaceAVT(DOMAttr $attribute)
+	protected function replaceAVT(Attr $attribute)
 	{
 		AVTHelper::replace(
 			$attribute,

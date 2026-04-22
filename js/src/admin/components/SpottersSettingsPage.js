@@ -20,8 +20,16 @@ export default class SpottersSettingsPage extends ExtensionPage {
     
     this.offsetOrig = 0; // Orijinaller için ayrı sayfalama
 
+    // ADMIN WATERMARK
+    this.adminWatermarks = [];
+    this.newWmUsername = '';
+    this.newWmType = 'yatay';
+    this.newWmFile = null;
+    this.isUploadingWm = false;
+
     this.loadImages();
     this.loadOriginals(); // Orijinalleri de yükle
+    this.loadAdminWatermarks();
   }
 
   content() {
@@ -34,25 +42,25 @@ export default class SpottersSettingsPage extends ExtensionPage {
             <h3 className="Settings-title">Genel Yapılandırma</h3>
             {this.buildSettingComponent({
                 type: 'number',
-                setting: 'ulasiminfo-upload-exif.resize_width',
+                setting: 'ulasimarsiv-upload-exif.resize_width',
                 label: 'Maksimum Fotoğraf Genişliği (px)',
                 placeholder: '3840'
             })}
             {this.buildSettingComponent({
                 type: 'number',
-                setting: 'ulasiminfo-upload-exif.compression_quality',
+                setting: 'ulasimarsiv-upload-exif.compression_quality',
                 label: 'Sıkıştırma Kalitesi (0-100)',
                 placeholder: '90'
             })}
              {this.buildSettingComponent({
                 type: 'number',
-                setting: 'ulasiminfo-upload-exif.thumb_width',
+                setting: 'ulasimarsiv-upload-exif.thumb_width',
                 label: 'Thumbnail Genişliği',
                 placeholder: '1024'
             })}
              {this.buildSettingComponent({
                 type: 'number',
-                setting: 'ulasiminfo-upload-exif.mini_width',
+                setting: 'ulasimarsiv-upload-exif.mini_width',
                 label: 'Mini Galeri Genişliği',
                 placeholder: '250'
             })}
@@ -64,13 +72,13 @@ export default class SpottersSettingsPage extends ExtensionPage {
                 
                 {this.buildSettingComponent({
                     type: 'number',
-                    setting: 'ulasiminfo-upload-exif.original_resize_width',
+                    setting: 'ulasimarsiv-upload-exif.original_resize_width',
                     label: 'Orijinal Maksimum Genişlik (Opsiyonel)',
                     placeholder: 'Sınırsız (Boş Bırakın)'
                 })}
                 {this.buildSettingComponent({
                     type: 'number',
-                    setting: 'ulasiminfo-upload-exif.original_compression_quality',
+                    setting: 'ulasimarsiv-upload-exif.original_compression_quality',
                     label: 'Orijinal Sıkıştırma Kalitesi (0-100)',
                     placeholder: '100 (Kayıpsız)'
                 })}
@@ -81,7 +89,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
                 <h3 className="Settings-title">Görünürlük</h3>
                 {this.buildSettingComponent({
                     type: 'boolean', 
-                    setting: 'ulasiminfo-upload-exif.show_exif_publicly', 
+                    setting: 'ulasimarsiv-upload-exif.show_exif_publicly', 
                     label: 'EXIF Bilgilerini Herkese Göster',
                     help: 'Aktif edilirse ziyaretçiler ve üyeler kamera bilgilerini görebilir. Pasifse sadece admin görür.'
                 })}
@@ -95,7 +103,76 @@ export default class SpottersSettingsPage extends ExtensionPage {
             </div>
           </div>
 
-          <hr />
+          <hr style={{margin: '40px 0'}} />
+
+          {/* --- ADMIN WATERMARK YÖNETİMİ (YENİ) --- */}
+          <div className="WatermarkManager-section">
+            <h3 className="Settings-title" style={{color: '#27ae60'}}>
+                <i className="fas fa-stamp" style={{marginRight:'10px'}}></i>
+                Filigran (Watermark) Yönetimi
+            </h3>
+            <p className="helpText">Kullanıcılara özel yatay veya dikey imzaları buradan yükleyebilirsiniz. Sistem otomatik olarak klasör açıp doğru isimlendirmeyi (örn: <code>alikaankaya_yatay_wm.png</code>) yapacaktır. Sadece <strong>.png</strong> formatı desteklenir.</p>
+
+            <div style={{ display: 'flex', gap: '15px', alignItems: 'center', background: '#f9f9f9', padding: '15px', borderRadius: '6px', border: '1px solid #ddd', marginBottom: '20px', flexWrap: 'wrap' }}>
+                <input 
+                    className="FormControl" 
+                    type="text" 
+                    placeholder="Kullanıcı Adı (Örn: alikaankaya)" 
+                    value={this.newWmUsername}
+                    oninput={e => this.newWmUsername = e.target.value}
+                    style={{width: '200px'}}
+                />
+                <select className="FormControl" value={this.newWmType} onchange={e => this.newWmType = e.target.value} style={{width: '120px'}}>
+                    <option value="yatay">Yatay</option>
+                    <option value="dikey">Dikey</option>
+                </select>
+                <input 
+                    type="file" 
+                    accept="image/png"
+                    onchange={e => this.newWmFile = e.target.files[0]}
+                />
+                <Button 
+                    className="Button Button--primary" 
+                    icon="fas fa-upload" 
+                    loading={this.isUploadingWm}
+                    onclick={() => this.uploadAdminWatermark()}
+                    disabled={!this.newWmUsername || !this.newWmFile}
+                >
+                    Yükle
+                </Button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
+                {this.adminWatermarks.map(folder => (
+                    <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden' }}>
+                        <div style={{ background: '#f5f6fa', padding: '10px', borderBottom: '1px solid #eee', fontWeight: 'bold' }}>
+                            <i className="fas fa-folder-open" style={{color: '#f39c12', marginRight: '8px'}}></i>
+                            {folder.username}
+                        </div>
+                        <div style={{ padding: '10px' }}>
+                            {folder.watermarks.length === 0 ? <span style={{color:'#999', fontSize:'12px'}}>İmza Yok</span> : null}
+                            {folder.watermarks.map(wm => (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '12px' }}>
+                                    <div style={{display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden'}}>
+                                        <div style={{width:'30px', height:'20px', background:'#eee', borderRadius:'3px', overflow:'hidden', flexShrink:0}}>
+                                            <img src={app.forum.attribute('baseUrl') + wm.url} style={{width:'100%', height:'100%', objectFit:'contain'}} />
+                                        </div>
+                                        <span title={wm.filename} style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                                            {wm.type === 'yatay' ? <strong style={{color:'#3498db'}}>[Yatay]</strong> : (wm.type === 'dikey' ? <strong style={{color:'#e74c3c'}}>[Dikey]</strong> : '')}
+                                        </span>
+                                    </div>
+                                    <Button className="Button Button--danger Button--icon" icon="fas fa-times" onclick={() => this.deleteAdminWatermark(folder.username, wm.filename)} style={{minWidth:'24px', height:'24px', padding:0}}></Button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+            
+            {this.adminWatermarks.length === 0 && <div style={{padding: '20px', textAlign: 'center', color: '#999'}}>Henüz özel imza klasörü bulunmuyor.</div>}
+          </div>
+
+          <hr style={{margin: '40px 0'}} />
 
           {/* --- BÖLÜM 3: TÜM MEDYA YÖNETİMİ (MEVCUT) --- */}
           <div className="MediaManager-section" style={{marginTop: '30px'}}>
@@ -231,9 +308,61 @@ export default class SpottersSettingsPage extends ExtensionPage {
     this.isLoading = true; m.redraw();
     const params = { page: { offset: this.offset, limit: this.limit } };
     if (this.searchQuery) params.filter = { q: this.searchQuery };
-    app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/spotter-images/all', params: params }).then(result => {
+    app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/ulasimarsiv-images/all', params: params }).then(result => {
         this.processResults(result, false);
     });
+  }
+
+  // --- ADMIN WATERMARK METOTLARI ---
+  loadAdminWatermarks() {
+      app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/ulasimarsiv-admin-watermarks' }).then(result => {
+          this.adminWatermarks = result.data || [];
+          m.redraw();
+      });
+  }
+
+  uploadAdminWatermark() {
+      if (!this.newWmUsername || !this.newWmFile) return;
+      
+      this.isUploadingWm = true;
+      m.redraw();
+
+      const data = new FormData();
+      data.append('username', this.newWmUsername);
+      data.append('type', this.newWmType);
+      data.append('watermark', this.newWmFile);
+
+      app.request({
+          method: 'POST',
+          url: app.forum.attribute('apiUrl') + '/ulasimarsiv-admin-watermarks',
+          serialize: raw => raw,
+          body: data
+      }).then(res => {
+          app.alerts.show({ type: 'success' }, res.message);
+          this.newWmFile = null;
+          // Input alanını sıfırla (hacky but works for files)
+          const fileInput = document.querySelector('input[type="file"]');
+          if (fileInput) fileInput.value = '';
+          
+          this.isUploadingWm = false;
+          this.loadAdminWatermarks();
+      }).catch(err => {
+          this.isUploadingWm = false;
+          m.redraw();
+      });
+  }
+
+  deleteAdminWatermark(username, filename) {
+      if (!confirm(`${username} kullanıcısının ${filename} imzasını silmek istediğinize emin misiniz?`)) return;
+
+      app.request({
+          method: 'POST',
+          url: app.forum.attribute('apiUrl') + '/ulasimarsiv-admin-watermarks-delete',
+          body: { username, filename }
+      }).then(res => {
+          app.alerts.show({ type: 'success' }, 'İmza silindi.');
+          this.loadAdminWatermarks();
+      });
   }
 
   // SADECE ORİJİNALLER (YENİ)
@@ -243,7 +372,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
         page: { offset: this.offsetOrig, limit: this.limit },
         filter: { has_original: 1 } // Backend'deki filtreyi tetikler
     };
-    app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/spotter-images/all', params: params }).then(result => {
+    app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/ulasimarsiv-images/all', params: params }).then(result => {
         this.processResults(result, true);
     });
   }
@@ -278,7 +407,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
 
     app.request({
         method: 'DELETE',
-        url: app.forum.attribute('apiUrl') + '/spotter-image/' + image.id
+        url: app.forum.attribute('apiUrl') + '/ulasimarsiv-image/' + image.id
     }).then(() => {
         this.images = this.images.filter(i => i.id !== image.id);
         this.originals = this.originals.filter(i => i.id !== image.id); // Orijinallerden de düş
@@ -294,7 +423,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
       // Target parametresi ile backend'e "sadece orijinali sil" diyoruz
       app.request({ 
           method: 'DELETE', 
-          url: app.forum.attribute('apiUrl') + '/spotter-image/' + image.id,
+          url: app.forum.attribute('apiUrl') + '/ulasimarsiv-image/' + image.id,
           params: { target: 'original' } 
       }).then(() => {
           // Listeden kaldırmak yerine sadece original_path'i null yapıp listeden atabiliriz

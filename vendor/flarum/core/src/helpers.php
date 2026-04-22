@@ -17,7 +17,6 @@ if (! function_exists('resolve')) {
      *
      * @template T
      * @param string|class-string<T> $name
-     * @param array $parameters
      * @return T|mixed
      */
     function resolve(string $name, array $parameters = [])
@@ -112,9 +111,9 @@ if (! function_exists('event')) {
 
 if (! function_exists('config')) {
     /**
-     * @deprecated do not use, will be transferred to flarum/laravel-helpers.
+     * @deprecated
      */
-    function config(string $key, $default = null)
+    function config(string $key, mixed $default = null): mixed
     {
         return resolve(Repository::class)->get($key, $default);
     }

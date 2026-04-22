@@ -5,8 +5,6 @@ import Page, { IPageAttrs } from '../../common/components/Page';
 import ItemList from '../../common/utils/ItemList';
 import DiscussionHero from './DiscussionHero';
 import DiscussionListPane from './DiscussionListPane';
-import PostStream from './PostStream';
-import PostStreamScrubber from './PostStreamScrubber';
 import LoadingIndicator from '../../common/components/LoadingIndicator';
 import SplitDropdown from '../../common/components/SplitDropdown';
 import listItems from '../../common/helpers/listItems';
@@ -15,6 +13,7 @@ import PostStreamState from '../states/PostStreamState';
 import Discussion from '../../common/models/Discussion';
 import Post from '../../common/models/Post';
 import { ApiResponseSingle } from '../../common/Store';
+import PageStructure from './PageStructure';
 
 export interface IDiscussionPageAttrs extends IPageAttrs {
   id: string;
@@ -26,6 +25,11 @@ export interface IDiscussionPageAttrs extends IPageAttrs {
  * the discussion list pane, the hero, the posts, and the sidebar.
  */
 export default class DiscussionPage<CustomAttrs extends IDiscussionPageAttrs = IDiscussionPageAttrs> extends Page<CustomAttrs> {
+  protected loading: boolean = true;
+
+  protected PostStream: any = null;
+  protected PostStreamScrubber: any = null;
+
   /**
    * The discussion that is being viewed.
    */
@@ -79,32 +83,26 @@ export default class DiscussionPage<CustomAttrs extends IDiscussionPageAttrs = I
     }
   }
 
-  view(): Mithril.Children {
-    return <div className="DiscussionPage">{this.viewItems().toArray()}</div>;
-  }
+  view() {
+    if (this.loading || !this.discussion) {
+      return <LoadingIndicator />;
+    }
 
-  viewItems(): ItemList<Mithril.Children> {
-    const items = new ItemList<Mithril.Children>();
-
-    items.add('pane', <DiscussionListPane state={app.discussions} />, 100);
-    items.add(
-      'discussions',
-      <div className="DiscussionPage-discussion">{this.discussion ? this.pageContent().toArray() : this.loadingItems().toArray()}</div>,
-      90
+    return (
+      <PageStructure
+        className="DiscussionPage"
+        loading={this.loading}
+        hero={this.hero.bind(this)}
+        sidebar={this.sidebar.bind(this)}
+        pane={() => <DiscussionListPane state={app.discussions} />}
+      >
+        {this.loading || (
+          <div className="DiscussionPage-stream">
+            <this.PostStream discussion={this.discussion} stream={this.stream} onPositionChange={this.positionChanged.bind(this)} />
+          </div>
+        )}
+      </PageStructure>
     );
-
-    return items;
-  }
-
-  /**
-   * List of components shown while the discussion is loading.
-   */
-  loadingItems(): ItemList<Mithril.Children> {
-    const items = new ItemList<Mithril.Children>();
-
-    items.add('spinner', <LoadingIndicator />, 100);
-
-    return items;
   }
 
   /**
@@ -126,52 +124,26 @@ export default class DiscussionPage<CustomAttrs extends IDiscussionPageAttrs = I
   }
 
   /**
-   * List of items rendered as the main page content.
-   */
-  pageContent(): ItemList<Mithril.Children> {
-    const items = new ItemList<Mithril.Children>();
-
-    items.add('hero', this.hero(), 100);
-    items.add('main', <div className="container">{this.mainContent().toArray()}</div>, 10);
-
-    return items;
-  }
-
-  /**
-   * List of items rendered inside the main page content container.
-   */
-  mainContent(): ItemList<Mithril.Children> {
-    const items = new ItemList<Mithril.Children>();
-
-    items.add('sidebar', this.sidebar(), 100);
-
-    items.add(
-      'poststream',
-      <div className="DiscussionPage-stream">
-        <PostStream discussion={this.discussion} stream={this.stream} onPositionChange={this.positionChanged.bind(this)} />
-      </div>,
-      10
-    );
-
-    return items;
-  }
-
-  /**
    * Load the discussion from the API or use the preloaded one.
    */
   load(): void {
-    const preloadedDiscussion = app.preloadedApiDocument<Discussion>();
-    if (preloadedDiscussion) {
-      // We must wrap this in a setTimeout because if we are mounting this
-      // component for the first time on page load, then any calls to m.redraw
-      // will be ineffective and thus any configs (scroll code) will be run
-      // before stuff is drawn to the page.
-      setTimeout(this.show.bind(this, preloadedDiscussion), 0);
-    } else {
-      const params = this.requestParams();
+    Promise.all([import('./PostStream'), import('./PostStreamScrubber')]).then(([PostStreamImport, PostStreamScrubberImport]) => {
+      this.PostStream = PostStreamImport.default;
+      this.PostStreamScrubber = PostStreamScrubberImport.default;
 
-      app.store.find<Discussion>('discussions', m.route.param('id'), params).then(this.show.bind(this));
-    }
+      const preloadedDiscussion = app.preloadedApiDocument<Discussion>();
+      if (preloadedDiscussion) {
+        // We must wrap this in a setTimeout because if we are mounting this
+        // component for the first time on page load, then any calls to m.redraw
+        // will be ineffective and thus any configs (scroll code) will be run
+        // before stuff is drawn to the page.
+        setTimeout(this.show.bind(this, preloadedDiscussion), 0);
+      } else {
+        const params = this.requestParams();
+
+        app.store.find<Discussion>('discussions', m.route.param('id'), params).then(this.show.bind(this));
+      }
+    });
 
     m.redraw();
   }
@@ -191,44 +163,21 @@ export default class DiscussionPage<CustomAttrs extends IDiscussionPageAttrs = I
    * Initialize the component to display the given discussion.
    */
   show(discussion: ApiResponseSingle<Discussion>): void {
+    this.loading = false;
+
     app.history.push('discussion', discussion.title());
     app.setTitle(discussion.title());
     app.setTitleCount(0);
 
-    // When the API responds with a discussion, it will also include a number of
-    // posts. Some of these posts are included because they are on the first
-    // page of posts we want to display (determined by the `near` parameter) –
-    // others may be included because due to other relationships introduced by
-    // extensions. We need to distinguish the two so we don't end up displaying
-    // the wrong posts. We do so by filtering out the posts that don't have
-    // the 'discussion' relationship linked, then sorting and splicing.
-    let includedPosts: Post[] = [];
-    if (discussion.payload && discussion.payload.included) {
-      const discussionId = discussion.id();
-
-      includedPosts = discussion.payload.included
-        .filter(
-          (record) =>
-            record.type === 'posts' &&
-            record.relationships &&
-            record.relationships.discussion &&
-            !Array.isArray(record.relationships.discussion.data) &&
-            record.relationships.discussion.data.id === discussionId
-        )
-        // We can make this assertion because posts should be in the store,
-        // since they were in the discussion's payload.
-        .map((record) => app.store.getById<Post>('posts', record.id) as Post)
-        .sort((a: Post, b: Post) => a.number() - b.number())
-        .slice(0, 20);
-    }
-
     // Set up the post stream for this discussion, along with the first page of
     // posts we want to display. Tell the stream to scroll down and highlight
     // the specific post that was routed to.
-    this.stream = new PostStreamState(discussion, includedPosts);
+    this.stream = new PostStreamState(discussion);
     const rawNearParam = m.route.param('near');
     const nearParam = rawNearParam === 'reply' ? 'reply' : parseInt(rawNearParam);
-    this.stream.goToNumber(nearParam || (includedPosts[0]?.number() ?? 0), true).then(() => {
+    // Post numbers start at 1; use 1 when near is missing/invalid so the first post gets the pop-in
+    const targetPost = nearParam === 'reply' ? 'reply' : nearParam && !isNaN(nearParam) ? nearParam : 1;
+    this.stream.goToNumber(targetPost, true).then(() => {
       this.discussion = discussion;
 
       app.current.set('discussion', discussion);
@@ -257,7 +206,7 @@ export default class DiscussionPage<CustomAttrs extends IDiscussionPageAttrs = I
       );
     }
 
-    items.add('scrubber', <PostStreamScrubber stream={this.stream} className="App-titleControl" />, -100);
+    items.add('scrubber', <this.PostStreamScrubber stream={this.stream} className="App-titleControl" />, -100);
 
     return items;
   }
@@ -265,18 +214,28 @@ export default class DiscussionPage<CustomAttrs extends IDiscussionPageAttrs = I
   /**
    * When the posts that are visible in the post stream change (i.e. the user
    * scrolls up or down), then we update the URL and mark the posts as read.
+   *
+   * URL and history writes are skipped when startNumber hasn't changed from the
+   * last known position — this prevents double history churn from the immediate
+   * post-scroll emit and the subsequent settle-end reconciliation both resolving
+   * to the same post. Read-state saves are intentionally independent of this
+   * guard and use their own endNumber condition.
    */
   positionChanged(startNumber: number, endNumber: number): void {
     const discussion = this.discussion;
 
     if (!discussion) return;
 
-    // Construct a URL to this discussion with the updated position, then
-    // replace it into the window's history and our own history stack.
-    const url = app.route.discussion(discussion, (this.near = startNumber));
+    // Only write history when the visible start post actually changed.
+    if (startNumber !== this.near) {
+      // Construct a URL to this discussion with the updated position, then
+      // replace it into the window's history and our own history stack.
+      const url = app.route.discussion(discussion, startNumber);
+      this.near = startNumber;
 
-    window.history.replaceState(null, document.title, url);
-    app.history.push('discussion', discussion.title());
+      window.history.replaceState(null, document.title, url);
+      app.history.push('discussion', discussion.title());
+    }
 
     // If the user hasn't read past here before, then we'll update their read
     // state and redraw.

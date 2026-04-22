@@ -1,0 +1,30 @@
+.DetailedDropdownItem {
+  .Dropdown-menu > li > & {
+    align-items: start;
+  }
+
+  .Button-icon {
+    margin-top: 2px;
+  }
+}
+
+.DetailedDropdownItem-checkIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.DetailedDropdownItem-content {
+  display: grid;
+  grid-template-columns: 25px 1fr;
+  white-space: normal;
+}
+
+.DetailedDropdownItem-description {
+  display: block;
+  color: var(--muted-color);
+  font-size: 12px;
+  margin-top: 3px;
+}

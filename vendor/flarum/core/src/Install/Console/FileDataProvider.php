@@ -19,12 +19,13 @@ use Symfony\Component\Yaml\Yaml;
 
 class FileDataProvider implements DataProviderInterface
 {
-    protected $debug = false;
-    protected $baseUrl = null;
-    protected $databaseConfiguration = [];
-    protected $adminUser = [];
-    protected $settings = [];
-    protected $extensions = [];
+    protected bool $debug = false;
+    protected ?string $baseUrl = null;
+    protected array $databaseConfiguration = [];
+    protected array $adminUser = [];
+    protected array $settings = [];
+    protected ?array $extensions = null;
+    protected array $queue = ['driver' => 'sync'];
 
     public function __construct(InputInterface $input)
     {
@@ -44,12 +45,13 @@ class FileDataProvider implements DataProviderInterface
             }
 
             // Define configuration variables
-            $this->debug = $configuration['debug'] ?? false;
-            $this->baseUrl = $configuration['baseUrl'] ?? 'http://flarum.localhost';
-            $this->databaseConfiguration = $configuration['databaseConfiguration'] ?? [];
-            $this->adminUser = $configuration['adminUser'] ?? [];
-            $this->settings = $configuration['settings'] ?? [];
-            $this->extensions = explode(',', $configuration['extensions'] ?? '');
+            $this->debug = (bool) ($configuration['debug'] ?? false);
+            $this->baseUrl = (string) ($configuration['baseUrl'] ?? 'http://flarum.localhost');
+            $this->databaseConfiguration = (array) ($configuration['databaseConfiguration'] ?? []);
+            $this->adminUser = (array) ($configuration['adminUser'] ?? []);
+            $this->settings = (array) ($configuration['settings'] ?? []);
+            $this->extensions = isset($configuration['extensions']) ? explode(',', (string) $configuration['extensions']) : null;
+            $this->queue = (array) ($configuration['queue'] ?? ['driver' => 'sync']);
         } else {
             throw new Exception('Configuration file does not exist.');
         }
@@ -63,7 +65,8 @@ class FileDataProvider implements DataProviderInterface
             ->databaseConfig($this->getDatabaseConfiguration())
             ->adminUser($this->getAdminUser())
             ->settings($this->settings)
-            ->extensions($this->extensions);
+            ->extensions($this->extensions)
+            ->queueConfig($this->queue);
     }
 
     private function getDatabaseConfiguration(): DatabaseConfig
@@ -73,6 +76,7 @@ class FileDataProvider implements DataProviderInterface
             $this->databaseConfiguration['host'] ?? 'localhost',
             $this->databaseConfiguration['port'] ?? 3306,
             $this->databaseConfiguration['database'] ?? 'flarum',
+            $this->databaseConfiguration['search_path'] ?? 'public',
             $this->databaseConfiguration['username'] ?? 'root',
             $this->databaseConfiguration['password'] ?? '',
             $this->databaseConfiguration['prefix'] ?? ''

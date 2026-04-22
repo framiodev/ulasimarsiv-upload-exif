@@ -2,12 +2,12 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\TemplateNormalizations;
 
-use DOMElement;
+use s9e\SweetDOM\Element;
 
 /**
 * Optimize xsl:choose elements by integrating the content of another xsl:choose element located
@@ -23,21 +23,17 @@ class OptimizeNestedConditionals extends AbstractNormalization
 	/**
 	* {@inheritdoc}
 	*/
-	protected $queries = ['//xsl:choose/xsl:otherwise[count(node()) = 1]/xsl:choose'];
+	protected array $queries = ['//xsl:choose/xsl:otherwise[count(node()) = 1]/xsl:choose'];
 
 	/**
 	* {@inheritdoc}
 	*/
-	protected function normalizeElement(DOMElement $element)
+	protected function normalizeElement(Element $element): void
 	{
 		$otherwise   = $element->parentNode;
 		$outerChoose = $otherwise->parentNode;
+		$outerChoose->append(...$element->childNodes);
 
-		while ($element->firstChild)
-		{
-			$outerChoose->appendChild($element->removeChild($element->firstChild));
-		}
-
-		$outerChoose->removeChild($otherwise);
+		$otherwise->remove();
 	}
 }

@@ -1,7 +1,7 @@
 import Component, { ComponentAttrs } from '../../common/Component';
 import ItemList from '../../common/utils/ItemList';
 import KeyboardNavigatable from '../../common/utils/KeyboardNavigatable';
-import SearchState from '../states/SearchState';
+import SearchState from '../../common/states/SearchState';
 import type Mithril from 'mithril';
 /**
  * The `SearchSource` interface defines a section of search results in the
@@ -30,6 +30,10 @@ export interface SearchAttrs extends ComponentAttrs {
     state: SearchState;
 }
 /**
+ * @todo: 2.0 refactored the global search UI and no longer uses this component, now we use the GlobalSearch component.
+ *        The component was kept to support extension usage of it on a local scope.
+ *        We need to extract this component into a separate UI package instead as it is no longer needed by core.
+ *
  * The `Search` component displays a menu of as-you-type results from a variety
  * of sources.
  *
@@ -47,20 +51,9 @@ export default class Search<T extends SearchAttrs = SearchAttrs> extends Compone
      */
     protected static MIN_SEARCH_LEN: number;
     /**
-     * Time to wait (in milliseconds) after the user stops typing before triggering a search.
-     */
-    protected static SEARCH_DEBOUNCE_TIME_MS: number;
-    /**
      * The instance of `SearchState` for this component.
      */
     protected searchState: SearchState;
-    /**
-     * The instance of `SearchState` for this component.
-     *
-     * @deprecated Replace with`this.searchState` instead.
-     */
-    get state(): SearchState;
-    set state(state: SearchState);
     /**
      * Whether or not the search input has focus.
      */

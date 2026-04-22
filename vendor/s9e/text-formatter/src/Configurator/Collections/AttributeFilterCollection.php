@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\Collections;
@@ -49,7 +49,7 @@ class AttributeFilterCollection extends NormalizedCollection
 	* @param  string          $filterName Filter name, e.g. "int" or "color"
 	* @return AttributeFilter
 	*/
-	public static function getDefaultFilter($filterName)
+	public static function getDefaultFilter(string $filterName, ?array $constructorArgs = []): AttributeFilter
 	{
 		$filterName = ucfirst(strtolower($filterName));
 		$className  = 's9e\\TextFormatter\\Configurator\\Items\\AttributeFilters\\' . $filterName . 'Filter';
@@ -59,7 +59,7 @@ class AttributeFilterCollection extends NormalizedCollection
 			throw new InvalidArgumentException("Unknown attribute filter '" . $filterName . "'");
 		}
 
-		return new $className;
+		return new $className(...$constructorArgs);
 	}
 
 	/**

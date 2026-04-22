@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\RendererGenerators;
@@ -81,7 +81,7 @@ class PHP implements RendererGenerator
 	*/
 	public $phpHeader = '/**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */';
 
@@ -147,7 +147,7 @@ class PHP implements RendererGenerator
 	public function generate(Rendering $rendering)
 	{
 		// Compile the templates to PHP
-		$compiledTemplates = array_map([$this, 'compileTemplate'], $rendering->getTemplates());
+		$compiledTemplates = array_map($this->compileTemplate(...), $rendering->getTemplates());
 
 		// Start the code right after the class name, we'll prepend the header when we're done
 		$php = [];

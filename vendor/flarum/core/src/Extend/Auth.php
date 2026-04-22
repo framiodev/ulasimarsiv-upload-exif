@@ -15,8 +15,8 @@ use Illuminate\Contracts\Container\Container;
 
 class Auth implements ExtenderInterface
 {
-    private $addPasswordCheckers = [];
-    private $removePasswordCheckers = [];
+    private array $addPasswordCheckers = [];
+    private array $removePasswordCheckers = [];
 
     /**
      * Add a new password checker.
@@ -35,10 +35,8 @@ class Auth implements ExtenderInterface
      *           password checkers can run.
      * - `false` if the given password is invalid, and no other checkers should be considered.
      *            Evaluation will be immediately halted if any checkers return `false`.
-     *
-     * @return self
      */
-    public function addPasswordChecker(string $identifier, $callback): self
+    public function addPasswordChecker(string $identifier, callable|string $callback): self
     {
         $this->addPasswordCheckers[$identifier] = $callback;
 
@@ -49,7 +47,6 @@ class Auth implements ExtenderInterface
      * Remove a password checker.
      *
      * @param string $identifier: The unique identifier of the password checker to remove.
-     * @return self
      */
     public function removePasswordChecker(string $identifier): self
     {
@@ -58,7 +55,7 @@ class Auth implements ExtenderInterface
         return $this;
     }
 
-    public function extend(Container $container, Extension $extension = null)
+    public function extend(Container $container, ?Extension $extension = null): void
     {
         $container->extend('flarum.user.password_checkers', function ($passwordCheckers) use ($container) {
             foreach ($this->removePasswordCheckers as $identifier) {

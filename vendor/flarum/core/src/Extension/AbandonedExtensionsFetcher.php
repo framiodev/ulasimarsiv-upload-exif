@@ -11,7 +11,7 @@ namespace Flarum\Extension;
 
 use Flarum\Foundation\Application;
 use Flarum\Group\Group;
-use Flarum\Mail\Job\SendRawEmailJob;
+use Flarum\Mail\Job\SendAbandonedExtensionsEmailJob;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\User;
 use GuzzleHttp\Client;
@@ -27,43 +27,13 @@ class AbandonedExtensionsFetcher
 
     protected const SOURCE_URL = 'https://raw.githubusercontent.com/flarum/abandoned-extensions/main/abandoned.json';
 
-    /**
-     * @var ExtensionManager
-     */
-    protected $extensions;
-
-    /**
-     * @var SettingsRepositoryInterface
-     */
-    protected $settings;
-
-    /**
-     * @var Client
-     */
-    protected $client;
-
-    /**
-     * @var Queue
-     */
-    protected $queue;
-
-    /**
-     * @var TranslatorInterface
-     */
-    protected $translator;
-
     public function __construct(
-        ExtensionManager $extensions,
-        SettingsRepositoryInterface $settings,
-        Client $client,
-        Queue $queue,
-        TranslatorInterface $translator
+        protected ExtensionManager $extensions,
+        protected SettingsRepositoryInterface $settings,
+        protected Client $client,
+        protected Queue $queue,
+        protected TranslatorInterface $translator,
     ) {
-        $this->extensions = $extensions;
-        $this->settings = $settings;
-        $this->client = $client;
-        $this->queue = $queue;
-        $this->translator = $translator;
     }
 
     /**
@@ -152,14 +122,16 @@ class AbandonedExtensionsFetcher
         }, $newPackages);
 
         $subject = $this->translator->trans('core.email.abandoned_extensions.subject');
+        $forumTitle = $this->settings->get('forum_title', '');
 
         foreach ($admins as $admin) {
-            $body = $this->translator->trans('core.email.abandoned_extensions.body', [
-                'username' => $admin->display_name,
-                'extensions' => implode("\n", $lines),
-            ]);
-
-            $this->queue->push(new SendRawEmailJob($admin->email, $subject, $body));
+            $this->queue->push(new SendAbandonedExtensionsEmailJob(
+                email: $admin->email,
+                username: $admin->display_name,
+                subject: $subject,
+                extensionLines: $lines,
+                forumTitle: $forumTitle,
+            ));
         }
     }
 

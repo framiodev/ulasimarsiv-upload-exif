@@ -10,11 +10,11 @@
 namespace Flarum\Mail;
 
 use Flarum\Settings\SettingsRepositoryInterface;
-use GuzzleHttp\Client;
 use Illuminate\Contracts\Validation\Factory;
-use Illuminate\Mail\Transport\MailgunTransport;
 use Illuminate\Support\MessageBag;
-use Swift_Transport;
+use Symfony\Component\Mailer\Bridge\Mailgun\Transport\MailgunTransportFactory;
+use Symfony\Component\Mailer\Transport\Dsn;
+use Symfony\Component\Mailer\Transport\TransportInterface;
 
 class MailgunDriver implements DriverInterface
 {
@@ -35,7 +35,7 @@ class MailgunDriver implements DriverInterface
     public function validate(SettingsRepositoryInterface $settings, Factory $validator): MessageBag
     {
         return $validator->make($settings->all(), [
-            'mail_mailgun_secret' => ['required', $this->noWhitespace()],
+            'mail_mailgun_secret' => ['required', $this->noWhiteSpace()],
             'mail_mailgun_domain' => 'required|regex:/^(?!\-)(?:[a-zA-Z\d\-]{0,62}[a-zA-Z\d]\.){1,126}(?!\d+)[a-zA-Z\d]{1,63}$/',
             'mail_mailgun_region' => 'required|in:api.mailgun.net,api.eu.mailgun.net',
         ])->errors();
@@ -46,13 +46,15 @@ class MailgunDriver implements DriverInterface
         return true;
     }
 
-    public function buildTransport(SettingsRepositoryInterface $settings): Swift_Transport
+    public function buildTransport(SettingsRepositoryInterface $settings): TransportInterface
     {
-        return new MailgunTransport(
-            new Client(['connect_timeout' => 60]),
+        $factory = new MailgunTransportFactory();
+
+        return $factory->create(new Dsn(
+            'mailgun+api',
+            $settings->get('mail_mailgun_region'),
             $settings->get('mail_mailgun_secret'),
-            $settings->get('mail_mailgun_domain'),
-            $settings->get('mail_mailgun_region')
-        );
+            $settings->get('mail_mailgun_domain')
+        ));
     }
 }

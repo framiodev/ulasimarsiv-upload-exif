@@ -1,8 +1,8 @@
 import app from 'flarum/admin/app';
 import SpottersSettingsPage from './components/SpottersSettingsPage';
 
-app.initializers.add('ulasiminfo-upload-exif', () => {
+app.initializers.add('ulasimarsiv-upload-exif', () => {
   app.extensionData
-    .for('ulasiminfo-upload-exif')
+    .for('ulasimarsiv-upload-exif')
     .registerPage(SpottersSettingsPage);
 });

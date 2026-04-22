@@ -15,17 +15,23 @@ import type { ComponentAttrs } from './Component';
 import Model, { SavedModelData } from './Model';
 import IHistory from './IHistory';
 import IExtender from './extenders/IExtender';
+import SearchManager from './SearchManager';
+import { ColorScheme } from './components/ThemeMode';
 export type FlarumScreens = 'phone' | 'tablet' | 'desktop' | 'desktop-hd';
 export type FlarumGenericRoute = RouteItem<any, any, any>;
 export interface FlarumRequestOptions<ResponseType> extends Omit<Mithril.RequestOptions<ResponseType>, 'extract'> {
-    errorHandler?: (error: RequestError) => void;
-    url: string;
     /**
-     * Manipulate the response text before it is parsed into JSON.
+     * Custom error handler for failed requests. Overrides the default error handler.
      *
-     * @deprecated Please use `modifyText` instead.
+     * Return `false` (sync or promise) to fall back to the default error handler.
+     * Useful for handling specific errors without displaying error alerts to the user.
+     * To always show alerts, catch the error rejected by `app.request` instead.
+     *
+     * @param error
+     * @return  `false` (sync or promise) to fall back to the default error handler.
      */
-    extract?: (responseText: string) => string;
+    errorHandler?: (error: RequestError) => void | false | Promise<void | false>;
+    url: string;
     /**
      * Manipulate the response text before it is parsed into JSON.
      *
@@ -33,6 +39,10 @@ export interface FlarumRequestOptions<ResponseType> extends Omit<Mithril.Request
      */
     modifyText?: (responseText: string) => string;
 }
+export type NewComponent<Comp> = new () => Comp;
+export type AsyncNewComponent<Comp> = () => Promise<any & {
+    default: NewComponent<Comp>;
+}>;
 /**
  * A valid route definition.
  */
@@ -52,14 +62,14 @@ export type RouteItem<Attrs extends ComponentAttrs, Comp extends Component<Attrs
     /**
      * The component to render when this route matches.
      */
-    component: new () => Comp;
+    component: NewComponent<Comp> | AsyncNewComponent<Comp>;
     /**
      * A custom resolver class.
      *
      * This should be the class itself, and **not** an instance of the
      * class.
      */
-    resolverClass?: new (component: new () => Comp, routeName: string) => DefaultResolver<Attrs, Comp, RouteArgs>;
+    resolverClass?: new (component: NewComponent<Comp> | AsyncNewComponent<Comp>, routeName: string) => DefaultResolver<Attrs, Comp, RouteArgs>;
 } | {
     /**
      * An instance of a route resolver.
@@ -78,9 +88,9 @@ export interface RouteResolver<Attrs extends ComponentAttrs, Comp extends Compon
      *
      * @see https://mithril.js.org/route.html#routeresolveronmatch
      */
-    onmatch(this: this, args: RouteArgs, requestedPath: string, route: string): {
+    onmatch(this: this, args: RouteArgs, requestedPath: string, route: string): Promise<{
         new (): Comp;
-    };
+    }>;
     /**
      * A function which renders the provided component.
      *
@@ -93,6 +103,12 @@ export interface RouteResolver<Attrs extends ComponentAttrs, Comp extends Compon
      */
     render?(this: this, vnode: Mithril.Vnode<Attrs, Comp>): Mithril.Children;
 }
+export declare enum MaintenanceMode {
+    NO_MAINTENANCE = "none",
+    HIGH_MAINTENANCE = "high",
+    LOW_MAINTENANCE = "low",
+    SAFE_MODE = "safe"
+}
 export interface ApplicationData {
     apiDocument: ApiPayload | null;
     locale: string;
@@ -102,6 +118,8 @@ export interface ApplicationData {
         userId: number;
         csrfToken: string;
     };
+    maintenanceMode?: MaintenanceMode;
+    bisecting?: boolean;
     [key: string]: unknown;
 }
 /**
@@ -142,6 +160,7 @@ export default class Application {
      * The app's data store.
      */
     store: Store;
+    search: SearchManager;
     /**
      * A local cache that can be used to store data at the application level, so
      * that is persists between different routes.
@@ -182,6 +201,7 @@ export default class Application {
     history: IHistory | null;
     pane: any;
     data: ApplicationData;
+    allowUserColorScheme: boolean;
     refs: Record<string, string>;
     private _title;
     private _titleCount;
@@ -195,12 +215,26 @@ export default class Application {
      */
     private requestErrorAlert;
     initialRoute: string;
+    /**
+     * @internal
+     */
+    currentInitializerExtension: string | null;
+    private handledErrors;
+    private beforeMounts;
     load(payload: Application['data']): void;
+    protected initialize(): CallableFunction[];
     boot(): void;
+    beforeMount(callback: () => void): void;
+    protected runBeforeMount(): void;
     bootExtensions(extensions: Record<string, {
         extend?: IExtender[];
     }>): void;
     protected mount(basePath?: string): void;
+    private initColorScheme;
+    getSystemColorSchemePreference(): ColorScheme | string;
+    watchSystemColorSchemePreference(callback: () => void): void;
+    setColorScheme(scheme: ColorScheme | string): void;
+    setColoredHeader(value: boolean): void;
     /**
      * Get the API response document that has been preloaded into the application.
      */
@@ -249,4 +283,5 @@ export default class Application {
      * Construct a URL to the route with the given name.
      */
     route(name: string, params?: Record<string, unknown>): string;
+    handleErrorOnce(extension: null | string, errorId: string, userTitle: string, consoleTitle: string, error: any): void;
 }

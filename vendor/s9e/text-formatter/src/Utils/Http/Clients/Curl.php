@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Utils\Http\Clients;
@@ -24,10 +24,11 @@ class Curl extends Client
 		$options += ['headers' => []];
 
 		$handle = $this->getHandle();
-		curl_setopt($handle, CURLOPT_HEADER,     !empty($options['returnHeaders']));
-		curl_setopt($handle, CURLOPT_HTTPGET,    true);
-		curl_setopt($handle, CURLOPT_HTTPHEADER, $options['headers']);
-		curl_setopt($handle, CURLOPT_URL,        $url);
+		curl_setopt($handle, CURLOPT_FAILONERROR, false);
+		curl_setopt($handle, CURLOPT_HEADER,      !empty($options['returnHeaders']));
+		curl_setopt($handle, CURLOPT_HTTPGET,     true);
+		curl_setopt($handle, CURLOPT_HTTPHEADER,  $options['headers']);
+		curl_setopt($handle, CURLOPT_URL,         $url);
 
 		return curl_exec($handle);
 	}

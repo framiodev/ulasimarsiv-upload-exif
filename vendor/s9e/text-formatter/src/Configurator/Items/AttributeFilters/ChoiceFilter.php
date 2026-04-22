@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\Items\AttributeFilters;
@@ -18,7 +18,7 @@ class ChoiceFilter extends RegexpFilter
 	* @param  array $values        List of allowed values
 	* @param  bool  $caseSensitive Whether the choice is case-sensitive
 	*/
-	public function __construct(array $values = null, $caseSensitive = false)
+	public function __construct(?array $values = null, $caseSensitive = false)
 	{
 		parent::__construct();
 

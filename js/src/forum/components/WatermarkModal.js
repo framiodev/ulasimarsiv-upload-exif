@@ -514,7 +514,7 @@ export default class WatermarkModal extends Modal {
     else if (n.includes('beyaz')) { s.color = '#333'; s.bg = '#fff'; s.border = '#ddd'; c = 'Beyaz'; }
     else if (n.includes('renkli') || n.includes('color')) { s.color = '#e74c3c'; s.bg = '#fff'; s.border = '#e74c3c'; c = 'Renkli'; }
 
-    if (!n.includes('ulasiminfo')) {
+    if (!n.includes('ulasimarsiv')) {
         s.label = 'Kişisel İmza'; s.icon = 'fas fa-signature'; s.bg = '#e3f2fd'; s.color = '#1565c0'; s.border = '#90caf9'; s.isPersonal = true;
     } else {
         const p = n.includes('kose') ? ' (Köşe)' : (n.includes('orta') ? ' (Orta)' : '');

@@ -61,7 +61,7 @@ export default class InfoModal extends Modal<IInternalModalAttrs> {
     try {
       const response = await app.request<any>({
         method: 'GET',
-        url: app.forum.attribute('apiUrl') + '/info',
+        url: app.forum.attribute('apiUrl') + '/system-info/system',
       });
 
       this.info = response.data?.attributes?.content || 'No info available';

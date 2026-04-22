@@ -9,10 +9,17 @@
 
 namespace Flarum\Http\Filter;
 
-use Flarum\Filter\FilterInterface;
-use Flarum\Filter\FilterState;
-use Flarum\Filter\ValidateFilterTrait;
+use Flarum\Search\Database\DatabaseSearchState;
+use Flarum\Search\Filter\FilterInterface;
+use Flarum\Search\SearchState;
+use Flarum\Search\ValidateFilterTrait;
 
+/**
+ * Filters an access tokens request by the token type.
+ *
+ * @see \Flarum\Api\Controller\ListAccessTokensController
+ * @implements FilterInterface<DatabaseSearchState>
+ */
 class AccessTokenTypeFilter implements FilterInterface
 {
     use ValidateFilterTrait;
@@ -22,10 +29,10 @@ class AccessTokenTypeFilter implements FilterInterface
         return 'type';
     }
 
-    public function filter(FilterState $filterState, $filterValue, bool $negate)
+    public function filter(SearchState $state, array|string $filterValue, bool $negate): void
     {
         $type = $this->asString($filterValue);
 
-        $filterState->getQuery()->where('type', $negate ? '!=' : '=', $type);
+        $state->getQuery()->where('type', $negate ? '!=' : '=', $type);
     }
 }

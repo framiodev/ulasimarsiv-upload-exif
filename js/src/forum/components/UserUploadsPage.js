@@ -47,7 +47,7 @@ export default class UserUploadsPage extends UserPage {
 
     app.request({
       method: 'GET',
-      url: app.forum.attribute('apiUrl') + '/spotter-images',
+      url: app.forum.attribute('apiUrl') + '/ulasimarsiv-images',
       params: { filter: { user: userId } }
     }).then(response => {
       this.images = response.data || [];

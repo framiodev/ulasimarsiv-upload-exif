@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\RendererGenerators\PHP;
@@ -34,7 +34,7 @@ class XPathConvertor
 	/**
 	* Constructor
 	*/
-	public function __construct(RecursiveParser $parser = null)
+	public function __construct(?RecursiveParser $parser = null)
 	{
 		$this->features = [
 			'mbstring' => extension_loaded('mbstring'),

@@ -18,31 +18,22 @@ class TokensClearer
 {
     public function subscribe(Dispatcher $events): void
     {
-        $events->listen([PasswordChanged::class, EmailChanged::class], [$this, 'clearPasswordTokens']);
-        $events->listen(PasswordChanged::class, [$this, 'clearEmailTokens']);
-        $events->listen(PasswordChanged::class, [$this, 'clearAccessTokens']);
+        $events->listen([PasswordChanged::class, EmailChanged::class], $this->clearPasswordTokens(...));
+        $events->listen(PasswordChanged::class, $this->clearEmailTokens(...));
+        $events->listen(PasswordChanged::class, $this->clearAccessTokens(...));
     }
 
-    /**
-     * @param PasswordChanged|EmailChanged $event
-     */
-    public function clearPasswordTokens($event): void
+    public function clearPasswordTokens(EmailChanged|PasswordChanged $event): void
     {
         $event->user->passwordTokens()->delete();
     }
 
-    /**
-     * @param PasswordChanged $event
-     */
-    public function clearEmailTokens($event): void
+    public function clearEmailTokens(PasswordChanged $event): void
     {
         $event->user->emailTokens()->delete();
     }
 
-    /**
-     * @param PasswordChanged $event
-     */
-    public function clearAccessTokens($event): void
+    public function clearAccessTokens(PasswordChanged $event): void
     {
         AccessToken::query()->where('user_id', $event->user->id)->delete();
     }

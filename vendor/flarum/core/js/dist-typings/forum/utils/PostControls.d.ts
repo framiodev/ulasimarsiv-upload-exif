@@ -1,4 +1,5 @@
-declare namespace _default {
+export default PostControls;
+declare namespace PostControls {
     /**
      * Get a list of controls for a post.
      *
@@ -8,6 +9,11 @@ declare namespace _default {
      * @return {ItemList<import('mithril').Children>}')}
      */
     function controls(post: import("../../common/models/Post").default, context: import("../../common/Component").default<any, any>): ItemList<import("mithril").Children>;
+    function sections(): {
+        user: (post: import("../../common/models/Post").default, context: import("../../common/Component").default<any, any>) => ItemList<import("mithril").Children>;
+        moderation: (post: import("../../common/models/Post").default, context: import("../../common/Component").default<any, any>) => ItemList<import("mithril").Children>;
+        destructive: (post: import("../../common/models/Post").default, context: import("../../common/Component").default<any, any>) => ItemList<import("mithril").Children>;
+    };
     /**
      * Get controls for a post pertaining to the current user (e.g. report).
      *
@@ -63,5 +69,4 @@ declare namespace _default {
      */
     function deleteAction(context: any): Promise<void>;
 }
-export default _default;
 import ItemList from "../../common/utils/ItemList";

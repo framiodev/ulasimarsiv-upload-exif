@@ -1,26 +1,29 @@
 import app from '../../common/app';
-import Modal, { IInternalModalAttrs } from './Modal';
+import FormModal, { IFormModalAttrs } from '../../common/components/FormModal';
 import Button from './Button';
 import GroupBadge from './GroupBadge';
 import Group from '../models/Group';
+import sortGroups from '../utils/sortGroups';
 import extractText from '../utils/extractText';
 import ItemList from '../utils/ItemList';
 import Stream from '../utils/Stream';
 import type Mithril from 'mithril';
 import type User from '../models/User';
 import type { SaveAttributes, SaveRelationships } from '../Model';
+import Form from './Form';
 
-export interface IEditUserModalAttrs extends IInternalModalAttrs {
+export interface IEditUserModalAttrs extends IFormModalAttrs {
   user: User;
 }
 
-export default class EditUserModal<CustomAttrs extends IEditUserModalAttrs = IEditUserModalAttrs> extends Modal<CustomAttrs> {
+export default class EditUserModal<CustomAttrs extends IEditUserModalAttrs = IEditUserModalAttrs> extends FormModal<CustomAttrs> {
   protected username!: Stream<string>;
   protected email!: Stream<string>;
   protected isEmailConfirmed!: Stream<boolean>;
   protected setPassword!: Stream<boolean>;
   protected password!: Stream<string>;
   protected groups: Record<string, Stream<boolean>> = {};
+  protected availableGroups: Group[] = [];
 
   oninit(vnode: Mithril.Vnode<CustomAttrs, this>) {
     super.oninit(vnode);
@@ -35,10 +38,11 @@ export default class EditUserModal<CustomAttrs extends IEditUserModalAttrs = IEd
 
     const userGroups = user.groups() || [];
 
-    app.store
-      .all<Group>('groups')
-      .filter((group) => ![Group.GUEST_ID, Group.MEMBER_ID].includes(group.id()!))
-      .forEach((group) => (this.groups[group.id()!] = Stream(userGroups.includes(group))));
+    this.availableGroups = sortGroups(app.store.all<Group>('groups').filter((group) => ![Group.GUEST_ID, Group.MEMBER_ID].includes(group.id()!)));
+
+    this.availableGroups.forEach((group) => {
+      this.groups[group.id()!] = Stream(userGroups.includes(group));
+    });
   }
 
   className() {
@@ -53,7 +57,7 @@ export default class EditUserModal<CustomAttrs extends IEditUserModalAttrs = IEd
     const fields = this.fields().toArray();
     return (
       <div className="Modal-body">
-        {fields.length > 1 ? <div className="Form">{this.fields().toArray()}</div> : app.translator.trans('core.lib.edit_user.nothing_available')}
+        {fields.length > 1 ? <Form>{this.fields().toArray()}</Form> : app.translator.trans('core.lib.edit_user.nothing_available')}
       </div>
     );
   }
@@ -81,20 +85,16 @@ export default class EditUserModal<CustomAttrs extends IEditUserModalAttrs = IEd
           'email',
           <div className="Form-group">
             <label>{app.translator.trans('core.lib.edit_user.email_heading')}</label>
-            <div>
-              <input
-                className="FormControl"
-                placeholder={extractText(app.translator.trans('core.lib.edit_user.email_label'))}
-                bidi={this.email}
-                disabled={this.nonAdminEditingAdmin()}
-              />
-            </div>
+            <input
+              className="FormControl"
+              placeholder={extractText(app.translator.trans('core.lib.edit_user.email_label'))}
+              bidi={this.email}
+              disabled={this.nonAdminEditingAdmin()}
+            />
             {!this.isEmailConfirmed() && this.userIsAdmin(app.session.user) && (
-              <div>
-                <Button className="Button Button--block" loading={this.loading} onclick={this.activate.bind(this)}>
-                  {app.translator.trans('core.lib.edit_user.activate_button')}
-                </Button>
-              </div>
+              <Button className="Button Button--block" loading={this.loading} onclick={this.activate.bind(this)}>
+                {app.translator.trans('core.lib.edit_user.activate_button')}
+              </Button>
             )}
           </div>,
           30
@@ -119,17 +119,17 @@ export default class EditUserModal<CustomAttrs extends IEditUserModalAttrs = IEd
                 />
                 {app.translator.trans('core.lib.edit_user.set_password_label')}
               </label>
-              {this.setPassword() && (
-                <input
-                  className="FormControl"
-                  type="password"
-                  name="password"
-                  placeholder={extractText(app.translator.trans('core.lib.edit_user.password_label'))}
-                  bidi={this.password}
-                  disabled={this.nonAdminEditingAdmin()}
-                />
-              )}
             </div>
+            {this.setPassword() && (
+              <input
+                className="FormControl"
+                type="password"
+                name="password"
+                placeholder={extractText(app.translator.trans('core.lib.edit_user.password_label'))}
+                bidi={this.password}
+                disabled={this.nonAdminEditingAdmin()}
+              />
+            )}
           </div>,
           20
         );
@@ -142,25 +142,16 @@ export default class EditUserModal<CustomAttrs extends IEditUserModalAttrs = IEd
         <div className="Form-group EditUserModal-groups">
           <label>{app.translator.trans('core.lib.edit_user.groups_heading')}</label>
           <div>
-            {Object.keys(this.groups)
-              .map((id) => app.store.getById<Group>('groups', id))
-              .filter(Boolean)
-              .map(
-                (group) =>
-                  // Necessary because filter(Boolean) doesn't narrow out falsy values.
-                  group && (
-                    <label className="checkbox">
-                      <input
-                        type="checkbox"
-                        bidi={this.groups[group.id()!]}
-                        disabled={
-                          group.id() === Group.ADMINISTRATOR_ID && (this.attrs.user === app.session.user || !this.userIsAdmin(app.session.user))
-                        }
-                      />
-                      <GroupBadge group={group} label={null} /> {group.nameSingular()}
-                    </label>
-                  )
-              )}
+            {this.availableGroups.map((group) => (
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  bidi={this.groups[group.id()!]}
+                  disabled={group.id() === Group.ADMINISTRATOR_ID && (this.attrs.user === app.session.user || !this.userIsAdmin(app.session.user))}
+                />
+                <GroupBadge group={group} label={null} /> {group.nameSingular()}
+              </label>
+            ))}
           </div>
         </div>,
         10
@@ -169,7 +160,7 @@ export default class EditUserModal<CustomAttrs extends IEditUserModalAttrs = IEd
 
     items.add(
       'submit',
-      <div className="Form-group">
+      <div className="Form-group Form-controls">
         <Button className="Button Button--primary" type="submit" loading={this.loading}>
           {app.translator.trans('core.lib.edit_user.submit_button')}
         </Button>

@@ -2,12 +2,12 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\TemplateNormalizations;
 
-use DOMNode;
+use s9e\SweetDOM\Comment;
 
 /**
 * Remove all comments
@@ -17,13 +17,13 @@ class RemoveComments extends AbstractNormalization
 	/**
 	* {@inheritdoc}
 	*/
-	protected $queries = ['//comment()'];
+	protected array $queries = ['//comment()'];
 
 	/**
 	* {@inheritdoc}
 	*/
-	protected function normalizeNode(DOMNode $node)
+	protected function normalizeComment(Comment $comment): void
 	{
-		$node->parentNode->removeChild($node);
+		$comment->remove();
 	}
 }

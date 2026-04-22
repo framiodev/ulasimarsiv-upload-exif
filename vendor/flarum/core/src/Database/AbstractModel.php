@@ -11,10 +11,8 @@ namespace Flarum\Database;
 
 use Flarum\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model as Eloquent;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use LogicException;
 
 /**
  * Base model class, building on Eloquent.
@@ -22,8 +20,6 @@ use LogicException;
  * Adds the ability for custom relations to be added to a model during runtime.
  * These relations behave in the same way that you would expect; they can be
  * queried, eager loaded, and accessed as an attribute.
- *
- * @property-read int|null $id
  */
 abstract class AbstractModel extends Eloquent
 {
@@ -39,41 +35,39 @@ abstract class AbstractModel extends Eloquent
      *
      * @var callable[]
      */
-    protected $afterSaveCallbacks = [];
+    protected array $afterSaveCallbacks = [];
 
     /**
      * An array of callbacks to be run once after the model is deleted.
      *
      * @var callable[]
      */
-    protected $afterDeleteCallbacks = [];
+    protected array $afterDeleteCallbacks = [];
 
     /**
      * @internal
      */
-    public static $customRelations = [];
+    public static array $customCasts = [];
 
     /**
      * @internal
      */
-    public static $customCasts = [];
-
-    /**
-     * @internal
-     */
-    public static $defaults = [];
+    public static array $defaults = [];
 
     /**
      * An alias for the table name, used in queries.
      *
-     * @var string|null
      * @internal
      */
-    protected $tableAlias = null;
+    protected ?string $tableAlias = null;
 
     /**
-     * {@inheritdoc}
+     * If a model has unique keys, they should be defined here.
+     *
+     * @var array<string>|null
      */
+    public ?array $uniqueKeys = null;
+
     public static function boot()
     {
         parent::boot();
@@ -91,9 +85,6 @@ abstract class AbstractModel extends Eloquent
         });
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function __construct(array $attributes = [])
     {
         $this->attributes = [];
@@ -109,10 +100,7 @@ abstract class AbstractModel extends Eloquent
         parent::__construct($attributes);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getCasts()
+    public function getCasts(): array
     {
         $casts = parent::getCasts();
 
@@ -124,66 +112,17 @@ abstract class AbstractModel extends Eloquent
     }
 
     /**
-     * Get an attribute from the model. If nothing is found, attempt to load
-     * a custom relation method with this key.
-     *
-     * @param string $key
-     * @return mixed
-     */
-    public function getAttribute($key)
-    {
-        if (! is_null($value = parent::getAttribute($key))) {
-            return $value;
-        }
-
-        // If a custom relation with this key has been set up, then we will load
-        // and return results from the query and hydrate the relationship's
-        // value on the "relationships" array.
-        if (! $this->relationLoaded($key) && ($relation = $this->getCustomRelation($key))) {
-            if (! $relation instanceof Relation) {
-                throw new LogicException(
-                    'Relationship method must return an object of type '.Relation::class
-                );
-            }
-
-            return $this->relations[$key] = $relation->getResults();
-        }
-    }
-
-    /**
-     * Get a custom relation object.
-     *
-     * @param string $name
-     * @return mixed
-     */
-    protected function getCustomRelation($name)
-    {
-        foreach (array_merge([static::class], class_parents($this)) as $class) {
-            $relation = Arr::get(static::$customRelations, $class.".$name", null);
-            if (! is_null($relation)) {
-                return $relation($this);
-            }
-        }
-    }
-
-    /**
      * Register a callback to be run once after the model is saved.
-     *
-     * @param callable $callback
-     * @return void
      */
-    public function afterSave($callback)
+    public function afterSave(callable $callback): void
     {
         $this->afterSaveCallbacks[] = $callback;
     }
 
     /**
      * Register a callback to be run once after the model is deleted.
-     *
-     * @param callable $callback
-     * @return void
      */
-    public function afterDelete($callback)
+    public function afterDelete(callable $callback): void
     {
         $this->afterDeleteCallbacks[] = $callback;
     }
@@ -191,7 +130,7 @@ abstract class AbstractModel extends Eloquent
     /**
      * @return callable[]
      */
-    public function releaseAfterSaveCallbacks()
+    public function releaseAfterSaveCallbacks(): array
     {
         $callbacks = $this->afterSaveCallbacks;
 
@@ -203,7 +142,7 @@ abstract class AbstractModel extends Eloquent
     /**
      * @return callable[]
      */
-    public function releaseAfterDeleteCallbacks()
+    public function releaseAfterDeleteCallbacks(): array
     {
         $callbacks = $this->afterDeleteCallbacks;
 
@@ -213,19 +152,11 @@ abstract class AbstractModel extends Eloquent
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
-    public function __call($method, $arguments)
-    {
-        if ($relation = $this->getCustomRelation($method)) {
-            return $relation;
-        }
-
-        return parent::__call($method, $arguments);
-    }
-
     public function newModelQuery()
     {
+        /** @var \Illuminate\Database\Eloquent\Builder<static> $query */
         $query = parent::newModelQuery();
 
         if ($this->tableAlias) {
@@ -244,7 +175,7 @@ abstract class AbstractModel extends Eloquent
         return ($this->tableAlias ?? $this->getTable()).'.'.$column;
     }
 
-    public function withTableAlias(callable $callback)
+    public function withTableAlias(callable $callback): mixed
     {
         static $aliasCount = 0;
         $this->tableAlias = 'flarum_reserved_'.++$aliasCount;
@@ -256,11 +187,20 @@ abstract class AbstractModel extends Eloquent
         return $result;
     }
 
-    /**
-     * @param \Illuminate\Support\Collection|array $models
-     */
-    public function newCollection($models = [])
+    // @phpstan-ignore-next-line
+    public function newCollection(array $models = []): Collection
     {
+        // @phpstan-ignore-next-line
         return new Collection($models);
+    }
+
+    public function __sleep()
+    {
+        // Closures cannot be serialized.
+        // We should not need them if we are serializing a model.
+        $this->afterSaveCallbacks = [];
+        $this->afterDeleteCallbacks = [];
+
+        return parent::__sleep();
     }
 }

@@ -44,10 +44,10 @@ export default class DiscussionsSearchSource implements SearchSource {
     }) as Array<Mithril.Vnode>;
 
     return [
-      <li className="Dropdown-header">{app.translator.trans('core.forum.search.discussions_heading')}</li>,
+      <li className="Dropdown-header">{app.translator.trans('core.lib.search_source.discussions.heading')}</li>,
       <li>
         <LinkButton icon="fas fa-search" href={app.route('index', { q: this.queryString })}>
-          {app.translator.trans('core.forum.search.all_discussions_button', { query })}
+          {app.translator.trans('core.lib.search_source.discussions.all_button', { query })}
         </LinkButton>
       </li>,
       ...results,

@@ -1,15 +1,15 @@
 import app from '../../forum/app';
-import EditPostComposer from '../components/EditPostComposer';
 import Button from '../../common/components/Button';
 import Separator from '../../common/components/Separator';
 import ItemList from '../../common/utils/ItemList';
 import extractText from '../../common/utils/extractText';
+import haptic from '../../common/utils/haptic';
 
 /**
  * The `PostControls` utility constructs a list of buttons for a post which
  * perform actions on it.
  */
-export default {
+const PostControls = {
   /**
    * Get a list of controls for a post.
    *
@@ -21,8 +21,9 @@ export default {
   controls(post, context) {
     const items = new ItemList();
 
-    ['user', 'moderation', 'destructive'].forEach((section) => {
-      const controls = this[section + 'Controls'](post, context).toArray();
+    Object.entries(this.sections()).forEach(([section, method]) => {
+      const controls = method.call(this, post, context).toArray();
+
       if (controls.length) {
         controls.forEach((item) => items.add(item.itemName, item));
         items.add(section + 'Separator', <Separator />);
@@ -30,6 +31,14 @@ export default {
     });
 
     return items;
+  },
+
+  sections() {
+    return {
+      user: this.userControls,
+      moderation: this.moderationControls,
+      destructive: this.destructiveControls,
+    };
   },
 
   /**
@@ -121,8 +130,7 @@ export default {
    */
   editAction() {
     return new Promise((resolve) => {
-      app.composer.load(EditPostComposer, { post: this });
-      app.composer.show();
+      app.composer.load(() => import('../components/EditPostComposer'), { post: this }).then(() => app.composer.show());
 
       return resolve();
     });
@@ -135,6 +143,7 @@ export default {
    */
   hideAction() {
     if (!confirm(extractText(app.translator.trans('core.forum.post_controls.hide_confirmation')))) return;
+    haptic('heavy');
     this.pushData({ attributes: { hiddenAt: new Date() }, relationships: { hiddenUser: app.session.user } });
 
     return this.save({ isHidden: true }).then(() => m.redraw());
@@ -158,6 +167,7 @@ export default {
    */
   deleteAction(context) {
     if (!confirm(extractText(app.translator.trans('core.forum.post_controls.delete_confirmation')))) return;
+    haptic('heavy');
     if (context) context.loading = true;
 
     return this.delete()
@@ -183,3 +193,5 @@ export default {
       });
   },
 };
+
+export default PostControls;

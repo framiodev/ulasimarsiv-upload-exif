@@ -9,20 +9,20 @@
 
 namespace Flarum\Extend;
 
+use Flarum\Console\AbstractCommand;
 use Flarum\Extension\Extension;
 use Flarum\Foundation\ContainerUtil;
 use Illuminate\Contracts\Container\Container;
 
 class Console implements ExtenderInterface
 {
-    protected $addCommands = [];
-    protected $scheduled = [];
+    protected array $addCommands = [];
+    protected array $scheduled = [];
 
     /**
      * Add a command to the console.
      *
-     * @param string $command: ::class attribute of command class, which must extend Flarum\Console\AbstractCommand.
-     * @return self
+     * @param class-string<AbstractCommand|\Illuminate\Console\Command> $command: ::class attribute of command class, which must extend \Flarum\Console\AbstractCommand.
      */
     public function command(string $command): self
     {
@@ -34,8 +34,8 @@ class Console implements ExtenderInterface
     /**
      * Schedule a command to run on an interval.
      *
-     * @param string $command: ::class attribute of command class, which must extend Flarum\Console\AbstractCommand.
-     * @param callable|string $callback
+     * @param class-string<AbstractCommand|\Illuminate\Console\Command> $command: ::class attribute of command class, which must extend Flarum\Console\AbstractCommand.
+     * @param (callable(\Illuminate\Console\Scheduling\Event $event): void)|class-string $callback
      *
      * The callback can be a closure or invokable class, and should accept:
      * - \Illuminate\Console\Scheduling\Event $event
@@ -43,20 +43,19 @@ class Console implements ExtenderInterface
      * The callback should apply relevant methods to $event, and does not need to return anything.
      *
      * @see https://laravel.com/api/8.x/Illuminate/Console/Scheduling/Event.html
-     * @see https://laravel.com/docs/8.x/scheduling#schedule-frequency-options
+     * @see https://laravel.com/docs/11.x/scheduling#schedule-frequency-options
      * for more information on available methods and what they do.
      *
      * @param array $args An array of args to call the command with.
-     * @return self
      */
-    public function schedule(string $command, $callback, $args = []): self
+    public function schedule(string $command, callable|string $callback, array $args = []): self
     {
         $this->scheduled[] = compact('args', 'callback', 'command');
 
         return $this;
     }
 
-    public function extend(Container $container, Extension $extension = null)
+    public function extend(Container $container, ?Extension $extension = null): void
     {
         $container->extend('flarum.console.commands', function ($existingCommands) {
             return array_merge($existingCommands, $this->addCommands);

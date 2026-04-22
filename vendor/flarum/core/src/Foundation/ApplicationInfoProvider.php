@@ -11,7 +11,6 @@ namespace Flarum\Foundation;
 
 use Carbon\Carbon;
 use Flarum\Locale\Translator;
-use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\SessionManager;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
@@ -24,103 +23,26 @@ use SessionHandlerInterface;
 
 class ApplicationInfoProvider
 {
-    /**
-     * @var SettingsRepositoryInterface
-     */
-    protected $settings;
-
-    /**
-     * @var Translator
-     */
-    protected $translator;
-
-    /**
-     * @var Schedule
-     */
-    protected $schedule;
-
-    /**
-     * @var ConnectionInterface
-     */
-    protected $db;
-
-    /**
-     * @var Config
-     */
-    protected $config;
-
-    /**
-     * @var SessionManager
-     */
-    protected $session;
-
-    /**
-     * @var SessionHandlerInterface
-     */
-    protected $sessionHandler;
-
-    /**
-     * @var Queue
-     */
-    protected $queue;
-
-    /**
-     * @var CacheRepository
-     */
-    protected $cache;
-
-    /**
-     * @param SettingsRepositoryInterface $settings
-     * @param Translator $translator
-     * @param Schedule $schedule
-     * @param ConnectionInterface $db
-     * @param Config $config
-     * @param SessionManager $session
-     * @param SessionHandlerInterface $sessionHandler
-     * @param Queue $queue
-     * @param CacheRepository $cache
-     */
     public function __construct(
-        SettingsRepositoryInterface $settings,
-        Translator $translator,
-        Schedule $schedule,
-        ConnectionInterface $db,
-        Config $config,
-        SessionManager $session,
-        SessionHandlerInterface $sessionHandler,
-        Queue $queue,
-        CacheRepository $cache
+        protected CacheRepository $cache,
+        protected Translator $translator,
+        protected Schedule $schedule,
+        protected ConnectionInterface $db,
+        protected Config $config,
+        protected SessionManager $session,
+        protected SessionHandlerInterface $sessionHandler,
+        protected Queue $queue
     ) {
-        $this->settings = $settings;
-        $this->translator = $translator;
-        $this->schedule = $schedule;
-        $this->db = $db;
-        $this->config = $config;
-        $this->session = $session;
-        $this->sessionHandler = $sessionHandler;
-        $this->queue = $queue;
-        $this->cache = $cache;
     }
 
-    /**
-     * Identify if any tasks are registered with the scheduler.
-     *
-     * @return bool
-     */
     public function scheduledTasksRegistered(): bool
     {
         return count($this->schedule->events()) > 0;
     }
 
-    /**
-     * Gets the current status of the scheduler.
-     *
-     * @return string
-     */
     public function getSchedulerStatus(): string
     {
-        // Read from cache instead of persistent settings
-        $status = $this->cache->get('schedule:last_run');
+        $status = $this->cache->get('flarum:schedule:last_run');
 
         if (! $status) {
             return $this->translator->trans('core.admin.dashboard.status.scheduler.never-run');
@@ -132,15 +54,10 @@ class ApplicationInfoProvider
             : $this->translator->trans('core.admin.dashboard.status.scheduler.inactive');
     }
 
-    /**
-     * Identify the queue driver in use.
-     *
-     * @return string
-     */
     public function identifyQueueDriver(): string
     {
         // Get class name
-        $queue = get_class($this->queue);
+        $queue = $this->queue::class;
         // Drop the namespace
         $queue = Str::afterLast($queue, '\\');
         // Lowercase the class name
@@ -151,17 +68,44 @@ class ApplicationInfoProvider
         return $queue;
     }
 
-    /**
-     * Identify the version of the database we are connected to.
-     *
-     * @return string
-     */
     public function identifyDatabaseVersion(): string
     {
-        // Cache for 24 hours since database version rarely changes
+        // Cache for 24 hours since the database version rarely changes
         return $this->cache->remember('flarum:db_version', 86400, function () {
-            return $this->db->selectOne('select version() as version')->version;
+            return match ($this->config['database.driver']) {
+                // Strip distribution suffix (e.g. "10.11.14-MariaDB-0+deb12u2" → "10.11.14")
+                'mysql', 'mariadb' => Str::before($this->db->selectOne('select version() as version')->version, '-'),
+                // SHOW server_version returns a clean version (e.g. "15.3"), unlike SELECT version() which includes platform info
+                'pgsql' => Str::before($this->db->selectOne('show server_version')->server_version, ' '),
+                'sqlite' => $this->db->selectOne('select sqlite_version() as version')->version,
+                default => 'Unknown',
+            };
         });
+    }
+
+    public function identifyDatabaseDriver(): string
+    {
+        return match ($this->config['database.driver']) {
+            'mysql' => 'MySQL',
+            'mariadb' => 'MariaDB',
+            'pgsql' => 'PostgreSQL',
+            'sqlite' => 'SQLite',
+            default => $this->config['database.driver'],
+        };
+    }
+
+    public function identifyDatabaseOptions(): array
+    {
+        if ($this->config['database.driver'] === 'pgsql') {
+            return [
+                'search_configurations' => collect($this->db->select('SELECT * FROM pg_ts_config'))
+                    ->pluck('cfgname')
+                    ->mapWithKeys(fn (string $cfgname) => [$cfgname => $cfgname])
+                    ->toArray(),
+            ];
+        }
+
+        return [];
     }
 
     /**
@@ -183,7 +127,7 @@ class ApplicationInfoProvider
             // Try to get the configured driver instance.
             // Driver instances are created on demand.
             $this->session->driver($configuredDriver);
-        } catch (InvalidArgumentException $e) {
+        } catch (InvalidArgumentException) {
             // An exception is thrown if the configured driver is not a valid driver.
             // So we fallback to the default driver.
             $driver = $defaultDriver;
@@ -194,7 +138,7 @@ class ApplicationInfoProvider
          * And compare that to the current configured driver.
          */
         // Get class name
-        $handlerName = get_class($this->sessionHandler);
+        $handlerName = $this->sessionHandler::class;
         // Drop the namespace
         $handlerName = Str::afterLast($handlerName, '\\');
         // Lowercase the class name
@@ -213,11 +157,6 @@ class ApplicationInfoProvider
         return $driver;
     }
 
-    /**
-     * Identifiy the current PHP version.
-     *
-     * @return string
-     */
     public function identifyPHPVersion(): string
     {
         return PHP_VERSION;

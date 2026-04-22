@@ -9,11 +9,16 @@
 
 namespace Flarum\Admin\Content;
 
+use Flarum\Database\AbstractModel;
 use Flarum\Extension\ExtensionManager;
 use Flarum\Foundation\ApplicationInfoProvider;
 use Flarum\Foundation\Config;
+use Flarum\Foundation\FontAwesome;
+use Flarum\Foundation\MaintenanceMode;
 use Flarum\Frontend\Document;
 use Flarum\Group\Permission;
+use Flarum\Search\AbstractDriver;
+use Flarum\Search\SearcherInterface;
 use Flarum\Settings\Event\Deserializing;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\User;
@@ -25,69 +30,20 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 
 class AdminPayload
 {
-    /**
-     * @var Container;
-     */
-    protected $container;
-
-    /**
-     * @var SettingsRepositoryInterface
-     */
-    protected $settings;
-
-    /**
-     * @var ExtensionManager
-     */
-    protected $extensions;
-
-    /**
-     * @var ConnectionInterface
-     */
-    protected $db;
-
-    /**
-     * @var Dispatcher
-     */
-    protected $events;
-
-    /**
-     * @var Config
-     */
-    protected $config;
-
-    /**
-     * @var ApplicationInfoProvider
-     */
-    protected $appInfo;
-
-    /**
-     * @param Container $container
-     * @param SettingsRepositoryInterface $settings
-     * @param ExtensionManager $extensions
-     * @param ConnectionInterface $db
-     * @param Dispatcher $events
-     * @param Config $config
-     * @param ApplicationInfoProvider $appInfo
-     */
     public function __construct(
-        Container $container,
-        SettingsRepositoryInterface $settings,
-        ExtensionManager $extensions,
-        ConnectionInterface $db,
-        Dispatcher $events,
-        Config $config,
-        ApplicationInfoProvider $appInfo
+        protected Container $container,
+        protected SettingsRepositoryInterface $settings,
+        protected ExtensionManager $extensions,
+        protected ConnectionInterface $db,
+        protected Dispatcher $events,
+        protected Config $config,
+        protected ApplicationInfoProvider $appInfo,
+        protected MaintenanceMode $maintenance,
+        protected FontAwesome $fontAwesome
     ) {
-        $this->container = $container;
-        $this->settings = $settings;
-        $this->extensions = $extensions;
-        $this->db = $db;
-        $this->events = $events;
-        $this->config = $config;
-        $this->appInfo = $appInfo;
     }
 
-    public function __invoke(Document $document, Request $request)
+    public function __invoke(Document $document, Request $request): void
     {
         $settings = $this->settings->all();
 
@@ -97,21 +53,34 @@ class AdminPayload
 
         $document->payload['settings'] = $settings;
         $document->payload['permissions'] = Permission::map();
-        $document->payload['extensions'] = $this->extensions->getExtensions()->toArray();
+        $extensions = $this->extensions->getExtensions()->toArray();
 
-        $document->payload['displayNameDrivers'] = array_keys($this->container->make('flarum.user.display_name.supported_drivers'));
-        $document->payload['slugDrivers'] = array_map(function ($resourceDrivers) {
-            return array_keys($resourceDrivers);
-        }, $this->container->make('flarum.http.slugDrivers'));
-
-        $document->payload['phpVersion'] = $this->appInfo->identifyPHPVersion();
-        $document->payload['mysqlVersion'] = $this->appInfo->identifyDatabaseVersion();
-        $document->payload['debugEnabled'] = Arr::get($this->config, 'debug');
-
-        if ($this->appInfo->scheduledTasksRegistered()) {
-            $document->payload['schedulerStatus'] = $this->appInfo->getSchedulerStatus();
+        // Allow a stored override (e.g. written by a future scheduled Packagist check) to supplement
+        // or correct the abandoned status derived from installed.json at Composer install time.
+        // Format: JSON object mapping extension ID → false|true|"replacement/package"
+        // A future scheduler task can write to this settings key without touching core parsing logic.
+        $abandonedOverrides = json_decode($this->settings->get('flarum.abandoned_overrides', '{}'), true) ?? [];
+        foreach ($abandonedOverrides as $id => $status) {
+            if (isset($extensions[$id])) {
+                $extensions[$id]['abandoned'] = $status;
+            }
         }
 
+        $document->payload['extensions'] = $extensions;
+        $document->payload['installedPackages'] = $this->extensions->getInstalledPackageNames();
+
+        $document->payload['displayNameDrivers'] = array_keys($this->container->make('flarum.user.display_name.supported_drivers'));
+        $document->payload['avatarDrivers'] = array_keys($this->container->make('flarum.user.avatar.supported_drivers'));
+        $document->payload['slugDrivers'] = array_map(array_keys(...), $this->container->make('flarum.http.slugDrivers'));
+        $document->payload['searchDrivers'] = $this->getSearchDrivers();
+
+        $document->payload['phpVersion'] = $this->appInfo->identifyPHPVersion();
+        $document->payload['dbDriver'] = $this->appInfo->identifyDatabaseDriver();
+        $document->payload['dbVersion'] = $this->appInfo->identifyDatabaseVersion();
+        $document->payload['dbOptions'] = $this->appInfo->identifyDatabaseOptions();
+        $document->payload['debugEnabled'] = Arr::get($this->config, 'debug');
+
+        $document->payload['schedulerStatus'] = $this->appInfo->getSchedulerStatus();
         $document->payload['queueDriver'] = $this->appInfo->identifyQueueDriver();
         $document->payload['sessionDriver'] = $this->appInfo->identifySessionDriver(true);
 
@@ -124,10 +93,40 @@ class AdminPayload
          */
         $document->payload['modelStatistics'] = [
             'users' => [
-                'total' => User::count()
+                'total' => User::query()->count()
             ]
         ];
 
+        $document->payload['maintenanceByConfig'] = $this->maintenance->configOverride();
+        $document->payload['safeModeExtensions'] = $this->maintenance->safeModeExtensions();
+        $document->payload['safeModeExtensionsConfig'] = $this->config->safeModeExtensions();
+
         $document->payload['announcementsDisabled'] = (bool) $this->config['flarum_announcements.disabled'];
+
+        $document->payload['fontawesomeByConfig'] = $this->fontAwesome->configOverride();
+
+        // If FontAwesome is configured via config.php, pass the actual config values to frontend
+        if ($this->fontAwesome->configOverride()) {
+            $document->payload['fontawesomeConfig'] = [
+                'source' => $this->fontAwesome->source(),
+                'cdn_url' => $this->fontAwesome->cdnUrl(),
+                'kit_url' => $this->fontAwesome->kitUrl(),
+            ];
+        }
+    }
+
+    protected function getSearchDrivers(): array
+    {
+        $searchDriversPerModel = [];
+
+        foreach ($this->container->make('flarum.search.drivers') as $driverClass => $searcherClasses) {
+            /** @var array<class-string<AbstractModel>, class-string<SearcherInterface>> $searcherClasses */
+            foreach ($searcherClasses as $modelClass => $searcherClass) {
+                /** @var class-string<AbstractDriver> $driverClass */
+                $searchDriversPerModel[$modelClass][] = $driverClass::name();
+            }
+        }
+
+        return $searchDriversPerModel;
     }
 }

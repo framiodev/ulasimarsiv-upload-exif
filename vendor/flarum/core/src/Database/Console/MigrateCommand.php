@@ -18,54 +18,36 @@ use Flarum\Settings\SettingsRepositoryInterface;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Schema\Builder;
+use Symfony\Component\Console\Command\Command;
 
 class MigrateCommand extends AbstractCommand
 {
-    /**
-     * @var Container
-     */
-    protected $container;
-
-    /**
-     * @var Paths
-     */
-    protected $paths;
-
-    /**
-     * @param Container $container
-     * @param Paths $paths
-     */
-    public function __construct(Container $container, Paths $paths)
-    {
-        $this->container = $container;
-        $this->paths = $paths;
-
+    public function __construct(
+        protected Container $container,
+        protected Paths $paths
+    ) {
         parent::__construct();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('migrate')
             ->setDescription('Run outstanding migrations');
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function fire()
+    protected function fire(): int
     {
         $this->info('Migrating Flarum...');
 
         $this->upgrade();
 
         $this->info('DONE.');
+
+        return Command::SUCCESS;
     }
 
-    public function upgrade()
+    public function upgrade(): void
     {
         $this->container->bind(Builder::class, function ($container) {
             return $container->make(ConnectionInterface::class)->getSchemaBuilder();
@@ -79,6 +61,8 @@ class MigrateCommand extends AbstractCommand
         $extensions = $this->container->make(ExtensionManager::class);
         $extensions->getMigrator()->setOutput($this->output);
 
+        // Re-sort and persist the enabled extension order so that any optional-dependencies
+        // added or changed since the last enable/disable cycle take effect immediately.
         $extensions->syncExtensionOrder();
 
         foreach ($extensions->getEnabledExtensions() as $name => $extension) {

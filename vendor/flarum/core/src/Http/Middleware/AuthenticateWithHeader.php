@@ -21,7 +21,7 @@ use Psr\Http\Server\RequestHandlerInterface as Handler;
 
 class AuthenticateWithHeader implements Middleware
 {
-    const TOKEN_PREFIX = 'Token ';
+    public const TOKEN_PREFIX = 'Token ';
 
     public function process(Request $request, Handler $handler): Response
     {
@@ -29,7 +29,7 @@ class AuthenticateWithHeader implements Middleware
 
         $parts = explode(';', $headerLine);
 
-        if (isset($parts[0]) && Str::startsWith($parts[0], self::TOKEN_PREFIX)) {
+        if (Str::startsWith($parts[0], self::TOKEN_PREFIX)) {
             $id = substr($parts[0], strlen(self::TOKEN_PREFIX));
 
             if ($key = ApiKey::where('key', $id)->first()) {
@@ -41,7 +41,7 @@ class AuthenticateWithHeader implements Middleware
                 $request = $request->withAttribute('apiKey', $key);
                 $request = $request->withAttribute('bypassThrottling', true);
             } elseif ($token = AccessToken::findValid($id)) {
-                $token->touch($request);
+                $token->touch(request: $request);
 
                 $actor = $token->user;
             }
@@ -63,12 +63,14 @@ class AuthenticateWithHeader implements Middleware
         return $handler->handle($request);
     }
 
-    private function getUser($string)
+    private function getUser(string $string): ?User
     {
         $parts = explode('=', trim($string));
 
-        if (isset($parts[0]) && $parts[0] === 'userId') {
+        if ($parts[0] === 'userId') {
             return User::find($parts[1]);
         }
+
+        return null;
     }
 }

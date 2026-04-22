@@ -12,37 +12,32 @@ namespace Flarum\Notification\Command;
 use Carbon\Carbon;
 use Flarum\Notification\Event\Read;
 use Flarum\Notification\Notification;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Events\Dispatcher;
 
 class ReadNotificationHandler
 {
-    /**
-     * @var Dispatcher
-     */
-    protected $events;
-
-    /**
-     * @param Dispatcher $events
-     */
-    public function __construct(Dispatcher $events)
-    {
-        $this->events = $events;
+    public function __construct(
+        protected Dispatcher $events,
+        protected CacheRepository $cache
+    ) {
     }
 
     /**
-     * @param ReadNotification $command
-     * @return \Flarum\Notification\Notification
-     * @throws \Flarum\User\Exception\PermissionDeniedException
+     * @throws \Flarum\User\Exception\NotAuthenticatedException
      */
-    public function handle(ReadNotification $command)
+    public function handle(ReadNotification $command): Notification
     {
         $actor = $command->actor;
 
         $actor->assertRegistered();
 
-        $notification = Notification::where('user_id', $actor->id)->findOrFail($command->notificationId);
+        /** @var Notification $notification */
+        $notification = Notification::query()
+            ->where('user_id', $actor->id)
+            ->findOrFail($command->notificationId);
 
-        Notification::where([
+        Notification::query()->where([
             'user_id' => $actor->id,
             'type' => $notification->type,
             'subject_id' => $notification->subject_id
@@ -52,9 +47,8 @@ class ReadNotificationHandler
         $notification->read_at = Carbon::now();
 
         // Invalidate notification count caches
-        $cache = resolve('cache.store');
-        $cache->forget("user.{$actor->id}.unread_notification_count");
-        $cache->forget("user.{$actor->id}.new_notification_count");
+        $this->cache->forget("user.{$actor->id}.unread_notification_count");
+        $this->cache->forget("user.{$actor->id}.new_notification_count");
 
         $this->events->dispatch(new Read($actor, $notification, Carbon::now()));
 

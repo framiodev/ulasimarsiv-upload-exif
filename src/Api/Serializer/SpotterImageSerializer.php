@@ -1,6 +1,6 @@
 <?php
 
-namespace UlasimInfo\UploadExif\Api\Serializer;
+namespace UlasimArsiv\UploadExif\Api\Serializer;
 
 use Flarum\Api\Serializer\AbstractSerializer;
 use Flarum\Api\Serializer\UserSerializer;
@@ -8,7 +8,7 @@ use Flarum\Api\Serializer\UserSerializer;
 class SpotterImageSerializer extends AbstractSerializer
 {
     // API'de bu nesnenin türü ne olacak?
-    protected $type = 'spotter-images';
+    protected $type = 'ulasimarsiv-images';
 
     // Admin paneline gönderilecek veriler
     protected function getDefaultAttributes($model)

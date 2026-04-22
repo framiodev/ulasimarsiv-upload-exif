@@ -11,7 +11,7 @@ namespace Flarum\Api\Controller;
 
 use Flarum\Announcements\AnnouncementsFetcher;
 use Flarum\Http\RequestUtil;
-use Illuminate\Contracts\Cache\Repository as CacheRepository;
+use Illuminate\Cache\Repository as CacheRepository;
 use Laminas\Diactoros\Response\JsonResponse;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -20,22 +20,14 @@ use Psr\Http\Server\RequestHandlerInterface;
 class ListAnnouncementsController implements RequestHandlerInterface
 {
     public const CACHE_KEY = 'flarum.announcements';
-    public const CACHE_TTL = 14 * 24 * 3600; // 14 days
+    public const CACHE_FRESH_TTL = 1 * 24 * 3600;  // serve fresh for 1 day
+    public const CACHE_STALE_TTL = 14 * 24 * 3600; // allow stale for 14 days
+    public const CACHE_TTL = self::CACHE_STALE_TTL; // used by the console command
 
-    /**
-     * @var CacheRepository
-     */
-    protected $cache;
-
-    /**
-     * @var AnnouncementsFetcher
-     */
-    protected $fetcher;
-
-    public function __construct(CacheRepository $cache, AnnouncementsFetcher $fetcher)
-    {
-        $this->cache = $cache;
-        $this->fetcher = $fetcher;
+    public function __construct(
+        protected CacheRepository $cache,
+        protected AnnouncementsFetcher $fetcher
+    ) {
     }
 
     public function handle(ServerRequestInterface $request): ResponseInterface
@@ -45,21 +37,21 @@ class ListAnnouncementsController implements RequestHandlerInterface
         if ($request->getQueryParams()['bust'] ?? false) {
             try {
                 $announcements = $this->fetcher->fetch();
-                $this->cache->put(self::CACHE_KEY, $announcements, self::CACHE_TTL);
-            } catch (\RuntimeException $_e) {
+                $this->cache->put(self::CACHE_KEY, $announcements, self::CACHE_STALE_TTL);
+            } catch (\RuntimeException) {
                 $announcements = $this->cache->get(self::CACHE_KEY, []);
             }
 
             return new JsonResponse($announcements);
         }
 
-        $announcements = $this->cache->remember(
+        $announcements = $this->cache->flexible(
             self::CACHE_KEY,
-            self::CACHE_TTL,
+            [self::CACHE_FRESH_TTL, self::CACHE_STALE_TTL],
             function () {
                 try {
                     return $this->fetcher->fetch();
-                } catch (\RuntimeException $_e) {
+                } catch (\RuntimeException) {
                     return null; // keep existing cached value
                 }
             }

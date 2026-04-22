@@ -1,6 +1,6 @@
 <?php
-namespace UlasimInfo\UploadExif\Api\Controller;
-use Flarum\Http\RequestUtil; use UlasimInfo\UploadExif\Database\SpotterImage;
+namespace UlasimArsiv\UploadExif\Api\Controller;
+use Flarum\Http\RequestUtil; use UlasimArsiv\UploadExif\Database\SpotterImage;
 use Laminas\Diactoros\Response\JsonResponse;
 class UserGalleryController implements \Psr\Http\Server\RequestHandlerInterface {
     public function handle(\Psr\Http\Message\ServerRequestInterface $request): \Psr\Http\Message\ResponseInterface {

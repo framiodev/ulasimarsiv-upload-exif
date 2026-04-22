@@ -1,18 +1,17 @@
 import app from '../../forum/app';
 import DiscussionPage from '../components/DiscussionPage';
-import ReplyComposer from '../components/ReplyComposer';
-import LogInModal from '../components/LogInModal';
 import Button from '../../common/components/Button';
 import Separator from '../../common/components/Separator';
 import RenameDiscussionModal from '../components/RenameDiscussionModal';
 import ItemList from '../../common/utils/ItemList';
 import extractText from '../../common/utils/extractText';
+import haptic from '../../common/utils/haptic';
 
 /**
  * The `DiscussionControls` utility constructs a list of buttons for a
  * discussion which perform actions on it.
  */
-export default {
+const DiscussionControls = {
   /**
    * Get a list of controls for a discussion.
    *
@@ -161,34 +160,33 @@ export default {
    * @param {boolean} goToLast Whether or not to scroll down to the last post if the discussion is being viewed.
    * @param {boolean} forceRefresh Whether or not to force a reload of the composer component, even if it is already open for this discussion.
    *
-   * @return {Promise<void>}
+   * @return {Promise<import('../states/ComposerState.js')>}
    */
-  replyAction(goToLast, forceRefresh) {
-    return new Promise((resolve, reject) => {
-      if (app.session.user) {
-        if (this.canReply()) {
-          if (!app.composer.composingReplyTo(this) || forceRefresh) {
-            app.composer.load(ReplyComposer, {
-              user: app.session.user,
-              discussion: this,
-            });
-          }
-          app.composer.show();
-
-          if (goToLast && app.viewingDiscussion(this) && !app.composer.isFullScreen()) {
-            app.current.get('stream').goToNumber('reply');
-          }
-
-          return resolve(app.composer);
-        } else {
-          return reject();
+  async replyAction(goToLast, forceRefresh) {
+    if (app.session.user) {
+      if (this.canReply()) {
+        if (!app.composer.composingReplyTo(this) || forceRefresh) {
+          await app.composer.load(() => import('../components/ReplyComposer'), {
+            user: app.session.user,
+            discussion: this,
+          });
         }
+
+        await app.composer.show();
+
+        if (goToLast && app.viewingDiscussion(this) && !app.composer.isFullScreen()) {
+          await app.current.get('stream').goToNumber('reply');
+        }
+
+        return Promise.resolve(app.composer);
+      } else {
+        return Promise.reject();
       }
+    }
 
-      app.modal.show(LogInModal);
+    await app.modal.show(() => import('../components/LogInModal'));
 
-      return reject();
-    });
+    return Promise.reject();
   },
 
   /**
@@ -197,6 +195,7 @@ export default {
    * @return {Promise<void>}
    */
   hideAction() {
+    haptic('heavy');
     this.pushData({ attributes: { hiddenAt: new Date() }, relationships: { hiddenUser: app.session.user } });
 
     return this.save({ isHidden: true });
@@ -208,6 +207,7 @@ export default {
    * @return {Promise<void>}
    */
   restoreAction() {
+    haptic('success');
     this.pushData({ attributes: { hiddenAt: null }, relationships: { hiddenUser: null } });
 
     return this.save({ isHidden: false });
@@ -220,6 +220,7 @@ export default {
    */
   deleteAction() {
     if (confirm(extractText(app.translator.trans('core.forum.discussion_controls.delete_confirmation')))) {
+      haptic('heavy');
       // If we're currently viewing the discussion that was deleted, go back
       // to the previous page.
       if (app.viewingDiscussion(this)) {
@@ -240,3 +241,5 @@ export default {
     });
   },
 };
+
+export default DiscussionControls;

@@ -9,20 +9,15 @@
 
 namespace Flarum\User\Command;
 
+use SensitiveParameter;
+
 class ConfirmEmail
 {
-    /**
-     * The email confirmation token.
-     *
-     * @var string
-     */
-    public $token;
-
-    /**
-     * @param string $token The email confirmation token.
-     */
-    public function __construct($token)
-    {
-        $this->token = $token;
+    public function __construct(
+        /**
+         * The email confirmation token.
+         */
+        #[SensitiveParameter] public string $token
+    ) {
     }
 }

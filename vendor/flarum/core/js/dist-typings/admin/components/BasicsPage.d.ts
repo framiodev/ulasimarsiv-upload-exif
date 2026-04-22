@@ -1,31 +1,30 @@
-/// <reference path="../../@types/translator-icu-rich.d.ts" />
 import ItemList from '../../common/utils/ItemList';
 import AdminPage from './AdminPage';
 import type { IPageAttrs } from '../../common/components/Page';
-import Mithril from 'mithril';
+import type Mithril from 'mithril';
 export type HomePageItem = {
     path: string;
     label: Mithril.Children;
 };
+export type DriverLocale = {
+    display_name: Record<string, string>;
+    avatar: Record<string, string>;
+    slug: Record<string, Record<string, string>>;
+};
 export default class BasicsPage<CustomAttrs extends IPageAttrs = IPageAttrs> extends AdminPage<CustomAttrs> {
-    localeOptions: Record<string, string>;
-    displayNameOptions: Record<string, string>;
-    slugDriverOptions: Record<string, Record<string, string>>;
-    abandonedSyncing: boolean;
-    abandonedSyncMessage: Mithril.Children;
     oninit(vnode: Mithril.Vnode<CustomAttrs, this>): void;
     headerInfo(): {
         className: string;
         icon: string;
-        title: import("@askvortsov/rich-icu-message-formatter").NestedStringArray;
-        description: import("@askvortsov/rich-icu-message-formatter").NestedStringArray;
+        title: string | any[];
+        description: string | any[];
     };
     content(): JSX.Element[];
     /**
      * Build a list of options for the default homepage. Each option must be an
      * object with `path` and `label` properties.
      */
-    homePageItems(): ItemList<HomePageItem>;
-    syncAbandoned(): void;
-    contentItems(): ItemList<Mithril.Children>;
+    static homePageItems(): ItemList<HomePageItem>;
+    static driverLocale(): DriverLocale;
+    static register(): void;
 }

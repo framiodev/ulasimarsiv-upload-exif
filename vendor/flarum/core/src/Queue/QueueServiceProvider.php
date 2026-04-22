@@ -16,6 +16,7 @@ use Flarum\Foundation\ErrorHandling\Reporter;
 use Flarum\Foundation\Paths;
 use Illuminate\Container\Container as ContainerImplementation;
 use Illuminate\Contracts\Cache\Factory as CacheFactory;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Debug\ExceptionHandler as ExceptionHandling;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -23,6 +24,7 @@ use Illuminate\Contracts\Queue\Factory;
 use Illuminate\Contracts\Queue\Queue;
 use Illuminate\Queue\Connectors\ConnectorInterface;
 use Illuminate\Queue\Console as Commands;
+use Illuminate\Queue\DatabaseQueue;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Failed\NullFailedJobProvider;
 use Illuminate\Queue\Listener as QueueListener;
@@ -31,7 +33,7 @@ use Illuminate\Queue\Worker;
 
 class QueueServiceProvider extends AbstractServiceProvider
 {
-    protected $commands = [
+    protected array $commands = [
         Commands\FlushFailedCommand::class,
         Commands\ForgetFailedCommand::class,
         Console\ListenCommand::class,
@@ -41,7 +43,7 @@ class QueueServiceProvider extends AbstractServiceProvider
         Console\WorkCommand::class,
     ];
 
-    public function register()
+    public function register(): void
     {
         // Register a simple connection factory that always returns the same
         // connection, as that is enough for our purposes.
@@ -54,7 +56,21 @@ class QueueServiceProvider extends AbstractServiceProvider
         // Extensions can override this binding if they want to make Flarum use
         // a different queuing backend.
         $this->container->singleton('flarum.queue.connection', function (ContainerImplementation $container) {
-            $queue = new SyncQueue;
+            /** @var Config $config */
+            $config = $container->make(Config::class);
+            $driver = $config->queueDriver() ?? 'sync';
+
+            if ($driver === 'database') {
+                $queue = new DatabaseQueue(
+                    $container->make('db.connection'),
+                    'queue_jobs',
+                    'default',
+                    60
+                );
+            } else {
+                $queue = new SyncQueue;
+            }
+
             $queue->setContainer($container);
 
             return $queue;
@@ -73,7 +89,7 @@ class QueueServiceProvider extends AbstractServiceProvider
                 $container['events'],
                 $container[ExceptionHandling::class],
                 function () use ($config) {
-                    return $config->inMaintenanceMode();
+                    return $config->inHighMaintenanceMode();
                 }
             );
 
@@ -91,36 +107,45 @@ class QueueServiceProvider extends AbstractServiceProvider
         // Bind a simple cache manager that returns the cache store.
         $this->container->singleton('cache', function (Container $container) {
             return new class($container) implements CacheFactory {
-                /**
-                 * @var Container
-                 */
-                private $container;
-
-                public function __construct(Container $container)
-                {
-                    $this->container = $container;
+                public function __construct(
+                    private readonly Container $container
+                ) {
                 }
 
-                public function driver()
+                public function driver(): Repository
                 {
                     return $this->container['cache.store'];
                 }
 
                 // We have to define this explicitly
                 // so that we implement the interface.
-                public function store($name = null)
+                public function store($name = null): mixed
                 {
                     return $this->__call($name, null);
                 }
 
-                public function __call($name, $arguments)
+                public function __call(string $name, ?array $arguments): mixed
                 {
                     return call_user_func_array([$this->driver(), $name], $arguments);
                 }
             };
         });
 
-        $this->container->singleton('queue.failer', function () {
+        $this->container->singleton('queue.failer', function (Container $container) {
+            $queue = $container->make('flarum.queue.connection');
+
+            if ($queue instanceof DatabaseQueue) {
+                /** @var Config $config */
+                $config = $container->make(Config::class);
+
+                return new DatabaseUuidFailedJobProvider(
+                    $container->make('db'),
+                    $config['database']['database'],
+                    'queue_failed_jobs',
+                    $container->make('db.connection')
+                );
+            }
+
             return new NullFailedJobProvider();
         });
 
@@ -132,15 +157,17 @@ class QueueServiceProvider extends AbstractServiceProvider
         $this->container->alias(Listener::class, 'queue.listener');
 
         $this->registerCommands();
+        $this->registerSchedule();
     }
 
-    protected function registerCommands()
+    protected function registerCommands(): void
     {
         $this->container->extend('flarum.console.commands', function ($commands, Container $container) {
-            $queue = $container->make(Queue::class);
+            // Extensions can override the queue connection binding.
+            // If they don't, it will be SyncQueue and we don't need queue commands.
+            $connection = $container->make('flarum.queue.connection');
 
-            // There is no need to have the queue commands when using the sync driver.
-            if ($queue instanceof SyncQueue) {
+            if ($connection instanceof SyncQueue) {
                 return $commands;
             }
 
@@ -150,7 +177,28 @@ class QueueServiceProvider extends AbstractServiceProvider
         });
     }
 
-    public function boot(Dispatcher $events, Container $container)
+    protected function registerSchedule(): void
+    {
+        $this->container->extend('flarum.console.scheduled', function ($scheduled, Container $container) {
+            $queue = $container->make(Queue::class);
+
+            // Only schedule the queue worker for the database driver specifically.
+            // Other queue drivers (like Redis/Horizon) should handle their own scheduling.
+            if ($queue instanceof DatabaseQueue) {
+                $scheduled[] = [
+                    'command' => Console\WorkCommand::class,
+                    'args' => $container->make(Console\DatabaseWorkerArgs::class)->args(),
+                    'callback' => function ($event) {
+                        $event->everyMinute();
+                    },
+                ];
+            }
+
+            return $scheduled;
+        });
+    }
+
+    public function boot(Dispatcher $events, Container $container): void
     {
         $events->listen(JobFailed::class, function (JobFailed $event) use ($container) {
             /** @var Registry $registry */

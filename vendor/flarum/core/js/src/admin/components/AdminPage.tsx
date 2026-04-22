@@ -3,15 +3,13 @@ import type Mithril from 'mithril';
 import app from '../app';
 import Page, { IPageAttrs } from '../../common/components/Page';
 import Button from '../../common/components/Button';
-import Switch from '../../common/components/Switch';
-import Select from '../../common/components/Select';
 import classList from '../../common/utils/classList';
 import Stream from '../../common/utils/Stream';
 import saveSettings from '../utils/saveSettings';
 import AdminHeader from './AdminHeader';
-import generateElementId from '../utils/generateElementId';
-import ColorPreviewInput from '../../common/components/ColorPreviewInput';
-import ItemList from '../../common/utils/ItemList';
+import FormGroup, { FieldComponentOptions } from '../../common/components/FormGroup';
+import extractText from '../../common/utils/extractText';
+import LoadingModal from './LoadingModal';
 
 export interface AdminHeaderOptions {
   title: Mithril.Children;
@@ -25,109 +23,11 @@ export interface AdminHeaderOptions {
   className: string;
 }
 
-/**
- * A type that matches any valid value for the `type` attribute on an HTML `<input>` element.
- *
- * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#attr-type
- *
- * Note: this will be exported from a different location in the future.
- *
- * @see https://github.com/flarum/core/issues/3039
- */
-export type HTMLInputTypes =
-  | 'button'
-  | 'checkbox'
-  | 'color'
-  | 'date'
-  | 'datetime-local'
-  | 'email'
-  | 'file'
-  | 'hidden'
-  | 'image'
-  | 'month'
-  | 'number'
-  | 'password'
-  | 'radio'
-  | 'range'
-  | 'reset'
-  | 'search'
-  | 'submit'
-  | 'tel'
-  | 'text'
-  | 'time'
-  | 'url'
-  | 'week';
-
-export interface CommonSettingsItemOptions extends Mithril.Attributes {
+export type SettingsComponentOptions = FieldComponentOptions & {
   setting: string;
-  label?: Mithril.Children;
-  help?: Mithril.Children;
-  className?: string;
-}
-
-/**
- * Valid options for the setting component builder to generate an HTML input element.
- */
-export interface HTMLInputSettingsComponentOptions extends CommonSettingsItemOptions {
-  /**
-   * Any valid HTML input `type` value.
-   */
-  type: HTMLInputTypes;
-}
-
-const BooleanSettingTypes = ['bool', 'checkbox', 'switch', 'boolean'] as const;
-const SelectSettingTypes = ['select', 'dropdown', 'selectdropdown'] as const;
-const TextareaSettingTypes = ['textarea'] as const;
-const ColorPreviewSettingType = 'color-preview' as const;
-
-/**
- * Valid options for the setting component builder to generate a Switch.
- */
-export interface SwitchSettingComponentOptions extends CommonSettingsItemOptions {
-  type: (typeof BooleanSettingTypes)[number];
-}
-
-/**
- * Valid options for the setting component builder to generate a Select dropdown.
- */
-export interface SelectSettingComponentOptions extends CommonSettingsItemOptions {
-  type: (typeof SelectSettingTypes)[number];
-  /**
-   * Map of values to their labels
-   */
-  options: { [value: string]: Mithril.Children };
-  default: string;
-}
-
-/**
- * Valid options for the setting component builder to generate a Textarea.
- */
-export interface TextareaSettingComponentOptions extends CommonSettingsItemOptions {
-  type: (typeof TextareaSettingTypes)[number];
-}
-
-/**
- * Valid options for the setting component builder to generate a ColorPreviewInput.
- */
-export interface ColorPreviewSettingComponentOptions extends CommonSettingsItemOptions {
-  type: typeof ColorPreviewSettingType;
-}
-
-export interface CustomSettingComponentOptions extends CommonSettingsItemOptions {
-  type: string;
-  [key: string]: unknown;
-}
-
-/**
- * All valid options for the setting component builder.
- */
-export type SettingsComponentOptions =
-  | HTMLInputSettingsComponentOptions
-  | SwitchSettingComponentOptions
-  | SelectSettingComponentOptions
-  | TextareaSettingComponentOptions
-  | ColorPreviewSettingComponentOptions
-  | CustomSettingComponentOptions;
+  json?: boolean;
+  refreshAfterSaving?: boolean;
+};
 
 /**
  * Valid attrs that can be returned by the `headerInfo` function
@@ -141,6 +41,8 @@ export type SaveSubmitEvent = SubmitEvent & { redraw: boolean };
 
 export default abstract class AdminPage<CustomAttrs extends IPageAttrs = IPageAttrs> extends Page<CustomAttrs> {
   settings: MutableSettings = {};
+  settingLabels: Record<string, Mithril.Children> = {};
+  refreshAfterSaving: string[] = [];
   loading: boolean = false;
 
   view(vnode: Mithril.Vnode<CustomAttrs, this>): Mithril.Children {
@@ -166,8 +68,39 @@ export default abstract class AdminPage<CustomAttrs extends IPageAttrs = IPageAt
    */
   submitButton(): Mithril.Children {
     return (
-      <Button onclick={this.saveSettings.bind(this)} className="Button Button--primary" loading={this.loading} disabled={!this.isChanged()}>
+      <Button
+        type="submit"
+        onclick={this.saveSettings.bind(this)}
+        className="Button Button--primary"
+        loading={this.loading}
+        disabled={!this.isChanged()}
+      >
         {app.translator.trans('core.admin.settings.submit_button')}
+      </Button>
+    );
+  }
+
+  /**
+   * Returns a button that opens a confirmation modal to delete all settings
+   * tracked by this page from the database, reverting them to their PHP-side defaults.
+   *
+   * Calls can pass an explicit list of setting keys to reset; otherwise all keys
+   * currently tracked in `this.settings` are used.
+   */
+  resetButton(
+    settings: import('./ResetExtensionSettingsModal').ResetSettingItem[] = Object.keys(this.settings).map((key) => ({
+      key,
+      label: this.settingLabels[key],
+    })),
+    title?: string,
+    extensionId?: string
+  ): Mithril.Children {
+    return (
+      <Button
+        className="Button Button--danger"
+        onclick={() => app.modal.show(() => import('./ResetExtensionSettingsModal'), { settings, title, extensionId })}
+      >
+        {app.translator.trans('core.admin.extension.reset_settings.button')}
       </Button>
     );
   }
@@ -195,41 +128,6 @@ export default abstract class AdminPage<CustomAttrs extends IPageAttrs = IPageAt
       title: '',
       description: '',
     };
-  }
-
-  /**
-   * A list of extension-defined custom setting components to be available through
-   * {@link AdminPage.buildSettingComponent}.
-   *
-   * The ItemList key represents the value for `type` to be provided when calling
-   * {@link AdminPage.buildSettingComponent}. Other attributes passed are provided
-   * as arguments to the function added to the ItemList.
-   *
-   * ItemList priority has no effect here.
-   *
-   * @example
-   * ```tsx
-   * extend(AdminPage.prototype, 'customSettingComponents', function (items) {
-   *   // You can access the AdminPage instance with `this` to access its `settings` property.
-   *
-   *   // Prefixing the key with your extension ID is recommended to avoid collisions.
-   *   items.add('my-ext.setting-component', (attrs) => {
-   *     return (
-   *       <div className={attrs.className}>
-   *         <label>{attrs.label}</label>
-   *         {attrs.help && <p className="helpText">{attrs.help}</p>}
-   *
-   *         My setting component!
-   *       </div>
-   *     );
-   *   })
-   * })
-   * ```
-   */
-  customSettingComponents(): ItemList<(attributes: CommonSettingsItemOptions) => Mithril.Children> {
-    const items = new ItemList<(attributes: CommonSettingsItemOptions) => Mithril.Children>();
-
-    return items;
   }
 
   /**
@@ -275,71 +173,34 @@ export default abstract class AdminPage<CustomAttrs extends IPageAttrs = IPageAt
       return entry.call(this);
     }
 
-    const customSettingComponents = this.customSettingComponents();
+    const { setting, json, refreshAfterSaving, ...attrs } = entry;
 
-    const { setting, help, type, label, ...componentAttrs } = entry;
+    const originalBidi: (value?: string) => any = this.setting(setting, (entry as any).default ?? '');
+    let bidi: (value?: string) => any;
 
-    const value = this.setting(setting)();
-
-    const [inputId, helpTextId] = [generateElementId(), generateElementId()];
-
-    let settingElement: Mithril.Children;
-
-    // Typescript being Typescript
-    // https://github.com/microsoft/TypeScript/issues/14520
-    if ((BooleanSettingTypes as readonly string[]).includes(type)) {
-      return (
-        // TODO: Add aria-describedby for switch help text.
-        //? Requires changes to Checkbox component to allow providing attrs directly for the element(s).
-        <div className="Form-group">
-          <Switch state={!!value && value !== '0'} onchange={this.settings[setting]} {...componentAttrs}>
-            {label}
-          </Switch>
-          <div className="helpText">{help}</div>
-        </div>
-      );
-    } else if ((SelectSettingTypes as readonly string[]).includes(type)) {
-      const { default: defaultValue, options, ...otherAttrs } = componentAttrs;
-
-      settingElement = (
-        <Select
-          id={inputId}
-          aria-describedby={helpTextId}
-          value={value || defaultValue}
-          options={options}
-          onchange={this.settings[setting]}
-          {...otherAttrs}
-        />
-      );
-    } else if (customSettingComponents.has(type)) {
-      return customSettingComponents.get(type)({ setting, help, label, ...componentAttrs });
-    } else {
-      componentAttrs.className = classList('FormControl', componentAttrs.className);
-
-      if ((TextareaSettingTypes as readonly string[]).includes(type)) {
-        settingElement = <textarea id={inputId} aria-describedby={helpTextId} bidi={this.setting(setting)} {...componentAttrs} />;
-      } else {
-        let Tag: VnodeElementTag = 'input';
-
-        if (type === ColorPreviewSettingType) {
-          Tag = ColorPreviewInput;
-        } else {
-          componentAttrs.type = type;
+    if (json) {
+      bidi = function (value?: string) {
+        if (arguments.length) {
+          originalBidi(JSON.stringify(value));
         }
 
-        settingElement = <Tag id={inputId} aria-describedby={helpTextId} bidi={this.setting(setting)} {...componentAttrs} />;
-      }
+        const v = originalBidi();
+
+        if (v) {
+          return JSON.parse(v);
+        }
+
+        return v;
+      };
+    } else {
+      bidi = originalBidi;
     }
 
-    return (
-      <div className="Form-group">
-        {label && <label for={inputId}>{label}</label>}
-        <div id={helpTextId} className="helpText">
-          {help}
-        </div>
-        {settingElement}
-      </div>
-    );
+    if (refreshAfterSaving) {
+      this.refreshAfterSaving.push(setting);
+    }
+
+    return <FormGroup stream={bidi} getSetting={this.setting.bind(this)} {...attrs} />;
   }
 
   /**
@@ -352,7 +213,7 @@ export default abstract class AdminPage<CustomAttrs extends IPageAttrs = IPageAt
   }
 
   /**
-   * Called when `saveSettings` completes with errors.
+   * Called when `saveSettings` fails to complete.
    */
   onsavefailed(): void {
     this.loading = false;
@@ -360,9 +221,16 @@ export default abstract class AdminPage<CustomAttrs extends IPageAttrs = IPageAt
 
   /**
    * Returns a function that fetches the setting from the `app` global.
+   *
+   * An optional `label` can be provided to associate a human-readable label
+   * with the setting key, which is used by `resetButton()` in the reset modal.
    */
-  setting(key: string, fallback: string = ''): Stream<string> {
+  setting(key: string, fallback: string = '', label?: Mithril.Children): Stream<string> {
     this.settings[key] = this.settings[key] || Stream<string>(app.data.settings[key] || fallback);
+
+    if (label !== undefined) {
+      this.settingLabels[key] = label;
+    }
 
     return this.settings[key];
   }
@@ -401,6 +269,24 @@ export default abstract class AdminPage<CustomAttrs extends IPageAttrs = IPageAt
 
     this.loading = true;
 
-    return saveSettings(this.dirty()).then(this.onsaved.bind(this)).catch(this.onsavefailed.bind(this));
+    const dirty = this.dirty();
+
+    return saveSettings(dirty)
+      .then(this.onsaved.bind(this))
+      .then(() => {
+        if (this.refreshAfterSaving.length && Object.keys(dirty).some((setting) => this.refreshAfterSaving.includes(setting))) {
+          app.modal.show(LoadingModal);
+          window.location.reload();
+        }
+      })
+      .catch(this.onsavefailed.bind(this));
+  }
+
+  static modelLocale(): Record<string, string> {
+    return {
+      'Flarum\\Discussion\\Discussion': extractText(app.translator.trans('core.admin.models.discussions')),
+      'Flarum\\User\\User': extractText(app.translator.trans('core.admin.models.users')),
+      'Flarum\\Post\\Post': extractText(app.translator.trans('core.admin.models.posts')),
+    };
   }
 }

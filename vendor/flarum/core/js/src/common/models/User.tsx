@@ -30,8 +30,16 @@ export default class User extends Model {
     return Model.attribute<string | undefined>('password').call(this);
   }
 
+  hasUploadedAvatar() {
+    return Model.attribute<boolean>('hasUploadedAvatar').call(this);
+  }
+
   avatarUrl() {
     return Model.attribute<string | null>('avatarUrl').call(this);
+  }
+
+  avatarSrcset() {
+    return Model.attribute<string | null>('avatarSrcset').call(this);
   }
 
   preferences() {

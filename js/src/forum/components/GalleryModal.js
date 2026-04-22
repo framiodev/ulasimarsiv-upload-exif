@@ -19,7 +19,7 @@ export default class GalleryModal extends Modal {
     this.loading = true;
     app.request({
       method: 'GET',
-      url: app.forum.attribute('apiUrl') + '/spotter-images/user'
+      url: app.forum.attribute('apiUrl') + '/ulasimarsiv-images/user'
     }).then(response => {
       // DEĞİŞİKLİK 1: SIRALAMA
       // ID'si büyük olan (yeni olan) en başa gelsin (b.id - a.id)
@@ -38,7 +38,7 @@ export default class GalleryModal extends Modal {
     
     app.request({
       method: 'DELETE',
-      url: app.forum.attribute('apiUrl') + '/spotter-image/' + img.id
+      url: app.forum.attribute('apiUrl') + '/ulasimarsiv-image/' + img.id
     }).then(() => {
       this.images = this.images.filter(i => i.id !== img.id);
       m.redraw();
@@ -48,7 +48,7 @@ export default class GalleryModal extends Modal {
   copyLink(img, e) {
     e.preventDefault(); 
     e.stopPropagation();
-    const bbcode = `[spotter-image id=${img.id} url=${img.thumb_path} alt=${img.filename}]`;
+    const bbcode = `[ulasimarsiv-image id=${img.id} url=${img.thumb_path} alt=${img.filename}]`;
     
     navigator.clipboard.writeText(bbcode).then(() => {
         app.alerts.show({ type: 'success' }, 'BBCode kopyalandı!');
@@ -59,7 +59,7 @@ export default class GalleryModal extends Modal {
     let altText = img.filename.split('.').slice(0, -1).join('.');
     altText = altText.replace(/[-_]/g, ' ');
 
-    const bbcode = `[spotter-image id=${img.id} url=${img.thumb_path} alt=${altText}]`;
+    const bbcode = `[ulasimarsiv-image id=${img.id} url=${img.thumb_path} alt=${altText}]`;
     this.editor.insertAtCursor(bbcode + '\n');
     this.hide();
   }

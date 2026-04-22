@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\Items\AttributeFilters;
@@ -19,7 +19,7 @@ class HashmapFilter extends AbstractMapFilter
 	* @param  array $map    Associative array in the form [key => value]
 	* @param  bool  $strict Whether this map is strict (values with no match are invalid)
 	*/
-	public function __construct(array $map = null, $strict = false)
+	public function __construct(?array $map = null, $strict = false)
 	{
 		parent::__construct('s9e\\TextFormatter\\Parser\\AttributeFilters\\HashmapFilter::filter');
 

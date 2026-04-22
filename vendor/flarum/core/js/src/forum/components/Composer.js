@@ -31,6 +31,8 @@ export default class Composer extends Component {
 
     // Store the initial position so that we can trigger animations correctly.
     this.prevPosition = this.state.position;
+
+    this.textEditorBuilt = false;
   }
 
   view() {
@@ -53,7 +55,9 @@ export default class Composer extends Component {
         <div className="Composer-handle" oncreate={this.configHandle.bind(this)} />
         <ul className="Composer-controls">{listItems(this.controlItems().toArray())}</ul>
         <div className="Composer-content" onclick={showIfMinimized}>
-          {ComposerBody && <ComposerBody {...body.attrs} composer={this.state} disabled={classes.minimized} />}
+          {ComposerBody && (
+            <ComposerBody {...body.attrs} composer={this.state} disabled={classes.minimized} onTextEditorBuilt={this.onTextEditorBuilt.bind(this)} />
+          )}
         </div>
       </div>
     );
@@ -62,6 +66,18 @@ export default class Composer extends Component {
   onupdate(vnode) {
     super.onupdate(vnode);
 
+    if (this.textEditorBuilt) {
+      this.updateContainer();
+    }
+  }
+
+  onTextEditorBuilt() {
+    this.state.resolveEditorReady();
+    this.updateContainer();
+    this.textEditorBuilt = true;
+  }
+
+  updateContainer() {
     if (this.state.position === this.prevPosition) {
       // Set the height of the Composer element and its contents on each redraw,
       // so that they do not lose it if their DOM elements are recreated.
@@ -164,7 +180,9 @@ export default class Composer extends Component {
    * Draw focus to the first focusable content element (the text editor).
    */
   focus() {
-    this.$('.Composer-content :input:enabled:visible, .TextEditor-editor').first().focus();
+    this.$(this.attrs.state.body.componentClass.focusOnSelector?.() || '.Composer-content :input:enabled:visible, .TextEditor-editor')
+      .first()
+      .focus();
   }
 
   /**
@@ -338,7 +356,10 @@ export default class Composer extends Component {
         items.add(
           'minimize',
           <ComposerButton
-            icon="fas fa-minus minimize"
+            icon={classList('fas minimize', {
+              'fa-minus': app.screen() !== 'phone',
+              'fa-times': app.screen() === 'phone',
+            })}
             title={app.translator.trans('core.forum.composer.minimize_tooltip')}
             onclick={this.state.minimize.bind(this.state)}
             itemClassName="App-backControl"

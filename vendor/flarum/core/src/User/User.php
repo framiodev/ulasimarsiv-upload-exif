@@ -20,7 +20,8 @@ use Flarum\Group\Permission;
 use Flarum\Http\AccessToken;
 use Flarum\Notification\Notification;
 use Flarum\Post\Post;
-use Flarum\User\DisplayName\DriverInterface;
+use Flarum\User\Avatar\DriverInterface as AvatarDriver;
+use Flarum\User\DisplayName\DriverInterface as DisplayNameDriver;
 use Flarum\User\Event\Activated;
 use Flarum\User\Event\AvatarChanged;
 use Flarum\User\Event\Deleted;
@@ -33,8 +34,12 @@ use Flarum\User\Exception\NotAuthenticatedException;
 use Flarum\User\Exception\PermissionDeniedException;
 use Illuminate\Contracts\Filesystem\Factory;
 use Illuminate\Contracts\Hashing\Hasher;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Arr;
-use Staudenmeir\EloquentEagerLimit\HasEagerLimit;
 
 /**
  * @property int $id
@@ -51,23 +56,31 @@ use Staudenmeir\EloquentEagerLimit\HasEagerLimit;
  * @property \Carbon\Carbon|null $read_notifications_at
  * @property int $discussion_count
  * @property int $comment_count
+ * @property-read Collection<int, Group> $groups
+ * @property-read Collection<int, Group> $visibleGroups
+ * @property-read Collection<int, Notification> $notifications
+ * @property-read Collection<int, AccessToken> $accessTokens
+ * @property-read Collection<int, Post> $posts
+ * @property-read Collection<int, Discussion> $discussions
+ * @property-read Collection<int, Discussion> $read
+ * @property-read Collection<int, Notification> $unreadNotifications
+ * @property-read Collection<int, LoginProvider> $loginProviders
+ * @property-read Collection<int, EmailToken> $emailTokens
+ * @property-read Collection<int, PasswordToken> $passwordTokens
  */
 class User extends AbstractModel
 {
     use EventGeneratorTrait;
     use ScopeVisibilityTrait;
-    use HasEagerLimit;
+    use HasFactory;
 
-    /**
-     * The attributes that should be mutated to dates.
-     *
-     * @var array
-     */
-    protected $dates = [
-        'joined_at',
-        'last_seen_at',
-        'marked_all_as_read_at',
-        'read_notifications_at'
+    protected $casts = [
+        'id' => 'integer',
+        'is_email_confirmed' => 'boolean',
+        'joined_at' => 'datetime',
+        'last_seen_at' => 'datetime',
+        'marked_all_as_read_at' => 'datetime',
+        'read_notifications_at' => 'datetime',
     ];
 
     /**
@@ -75,52 +88,53 @@ class User extends AbstractModel
      *
      * @var string[]|null
      */
-    protected $permissions = null;
+    protected ?array $permissions = null;
 
     /**
      * An array of callables, through each of which the user's list of groups is passed
      * before being returned.
+     *
+     * @var callable[]
      */
-    protected static $groupProcessors = [];
+    protected static array $groupProcessors = [];
 
     /**
      * An array of registered user preferences. Each preference is defined with
      * a key, and its value is an array containing the following keys:.
      *
-     * - transformer: a callback that confines the value of the preference
+     * - transformer: a callback that confines the value of the preference (nullable)
      * - default: a default value if the preference isn't set
      *
-     * @var array
+     * @var array<string, array{transformer: (callable(mixed): mixed)|null, default: mixed}>
      */
-    protected static $preferences = [];
+    protected static array $preferences = [];
 
     /**
      * A driver for getting display names.
-     *
-     * @var DriverInterface
      */
-    protected static $displayNameDriver;
+    protected static DisplayNameDriver $displayNameDriver;
+
+    /**
+     * A driver for getting avatar URLs.
+     */
+    protected static AvatarDriver $avatarDriver;
 
     /**
      * The hasher with which to hash passwords.
-     *
-     * @var Hasher
      */
-    protected static $hasher;
+    protected static Hasher $hasher;
 
     /**
      * The access gate.
-     *
-     * @var Access\Gate
      */
-    protected static $gate;
+    protected static Access\Gate $gate;
 
     /**
      * Callbacks to check passwords.
      *
-     * @var array
+     * @var callable[]
      */
-    protected static $passwordCheckers;
+    protected static array $passwordCheckers;
 
     /**
      * Difference from the current `last_seen` attribute value before `updateLastSeen()`
@@ -128,11 +142,6 @@ class User extends AbstractModel
      */
     private const LAST_SEEN_UPDATE_DIFF = 180;
 
-    /**
-     * Boot the model.
-     *
-     * @return void
-     */
     public static function boot()
     {
         parent::boot();
@@ -142,6 +151,12 @@ class User extends AbstractModel
             if ($user->id == 1) {
                 throw new DomainException('Cannot delete the root admin');
             }
+
+            $avatarPath = $user->getRawOriginal('avatar_url');
+
+            if ($avatarPath) {
+                resolve(AvatarUploader::class)->deleteAllVariants($avatarPath);
+            }
         });
 
         static::deleted(function (self $user) {
@@ -149,60 +164,38 @@ class User extends AbstractModel
 
             Notification::whereSubject($user)->delete();
         });
+
+        static::creating(function (self $user) {
+            $user->joined_at = Carbon::now();
+
+            $user->raise(new Registered($user));
+        });
     }
 
-    /**
-     * Register a new user.
-     *
-     * @param string $username
-     * @param string $email
-     * @param string $password
-     * @return static
-     */
-    public static function register($username, $email, $password)
-    {
-        $user = new static;
-
-        $user->username = $username;
-        $user->email = $email;
-        $user->password = $password;
-        $user->joined_at = Carbon::now();
-
-        $user->raise(new Registered($user));
-
-        return $user;
-    }
-
-    /**
-     * @param Access\Gate $gate
-     */
-    public static function setGate($gate)
+    public static function setGate(Access\Gate $gate): void
     {
         static::$gate = $gate;
     }
 
-    /**
-     * Set the display name driver.
-     *
-     * @param DriverInterface $driver
-     */
-    public static function setDisplayNameDriver(DriverInterface $driver)
+    public static function setDisplayNameDriver(DisplayNameDriver $driver): void
     {
         static::$displayNameDriver = $driver;
     }
 
-    public static function setPasswordCheckers(array $checkers)
+    /**
+     * Set the avatar driver.
+     */
+    public static function setAvatarDriver(AvatarDriver $driver): void
+    {
+        static::$avatarDriver = $driver;
+    }
+
+    public static function setPasswordCheckers(array $checkers): void
     {
         static::$passwordCheckers = $checkers;
     }
 
-    /**
-     * Rename the user.
-     *
-     * @param string $username
-     * @return $this
-     */
-    public function rename($username)
+    public function rename(string $username): static
     {
         if ($username !== $this->username) {
             $oldUsername = $this->username;
@@ -214,13 +207,7 @@ class User extends AbstractModel
         return $this;
     }
 
-    /**
-     * Change the user's email.
-     *
-     * @param string $email
-     * @return $this
-     */
-    public function changeEmail($email)
+    public function changeEmail(string $email): static
     {
         if ($email !== $this->email) {
             $this->email = $email;
@@ -231,13 +218,7 @@ class User extends AbstractModel
         return $this;
     }
 
-    /**
-     * Request that the user's email be changed.
-     *
-     * @param string $email
-     * @return $this
-     */
-    public function requestEmailChange($email)
+    public function requestEmailChange(string $email): static
     {
         if ($email !== $this->email) {
             $this->raise(new EmailChangeRequested($this, $email));
@@ -246,13 +227,7 @@ class User extends AbstractModel
         return $this;
     }
 
-    /**
-     * Change the user's password.
-     *
-     * @param string $password
-     * @return $this
-     */
-    public function changePassword($password)
+    public function changePassword(#[\SensitiveParameter] string $password): static
     {
         $this->password = $password;
 
@@ -263,20 +238,16 @@ class User extends AbstractModel
 
     /**
      * Set the password attribute, storing it as a hash.
-     *
-     * @param string $value
      */
-    public function setPasswordAttribute($value)
+    public function setPasswordAttribute(?string $value): void
     {
         $this->attributes['password'] = $value ? static::$hasher->make($value) : '';
     }
 
     /**
      * Mark all discussions as read.
-     *
-     * @return $this
      */
-    public function markAllAsRead()
+    public function markAllAsRead(): static
     {
         $this->marked_all_as_read_at = Carbon::now();
 
@@ -285,23 +256,15 @@ class User extends AbstractModel
 
     /**
      * Mark all notifications as read.
-     *
-     * @return $this
      */
-    public function markNotificationsAsRead()
+    public function markNotificationsAsRead(): static
     {
         $this->read_notifications_at = Carbon::now();
 
         return $this;
     }
 
-    /**
-     * Change the path of the user avatar.
-     *
-     * @param string|null $path
-     * @return $this
-     */
-    public function changeAvatarPath($path)
+    public function changeAvatarPath(?string $path): static
     {
         $this->avatar_url = $path;
 
@@ -311,37 +274,39 @@ class User extends AbstractModel
     }
 
     /**
-     * Get the URL of the user's avatar.
-     *
-     * @param string|null $value
-     * @return string
+     * Determine whether the user has uploaded a custom avatar.
      */
-    public function getAvatarUrlAttribute(string $value = null)
+    public function getHasUploadedAvatarAttribute(): bool
     {
-        if ($value && strpos($value, '://') === false) {
+        return isset($this->attributes['avatar_url']);
+    }
+
+    public function getAvatarUrlAttribute(?string $value = null): ?string
+    {
+        if ($value && ! str_contains($value, '://')) {
             return resolve(Factory::class)->disk('flarum-avatars')->url($value);
         }
 
-        return $value;
+        return $value ?? static::$avatarDriver->avatarUrl($this);
     }
 
-    /**
-     * Get the user's display name.
-     *
-     * @return string
-     */
-    public function getDisplayNameAttribute()
+    public function getAvatarSrcsetAttribute(): ?string
+    {
+        $value = $this->getRawOriginal('avatar_url');
+
+        if ($value && ! str_contains($value, '://')) {
+            return resolve(AvatarUploader::class)->srcsetFor($value);
+        }
+
+        return static::$avatarDriver->avatarSrcset($this);
+    }
+
+    public function getDisplayNameAttribute(): string
     {
         return static::$displayNameDriver->displayName($this);
     }
 
-    /**
-     * Check if a given password matches the user's password.
-     *
-     * @param string $password
-     * @return bool
-     */
-    public function checkPassword(string $password)
+    public function checkPassword(#[\SensitiveParameter] string $password): bool
     {
         $valid = false;
 
@@ -350,7 +315,9 @@ class User extends AbstractModel
 
             if ($result === false) {
                 return false;
-            } elseif ($result === true) {
+            }
+
+            if ($result === true) {
                 $valid = true;
             }
         }
@@ -358,12 +325,7 @@ class User extends AbstractModel
         return $valid;
     }
 
-    /**
-     * Activate the user's account.
-     *
-     * @return $this
-     */
-    public function activate()
+    public function activate(): static
     {
         if (! $this->is_email_confirmed) {
             $this->is_email_confirmed = true;
@@ -374,13 +336,7 @@ class User extends AbstractModel
         return $this;
     }
 
-    /**
-     * Check whether the user has a certain permission based on their groups.
-     *
-     * @param string $permission
-     * @return bool
-     */
-    public function hasPermission($permission)
+    public function hasPermission(string $permission): bool
     {
         if ($this->isAdmin()) {
             return true;
@@ -392,18 +348,15 @@ class User extends AbstractModel
     /**
      * Check whether the user has a permission that is like the given string,
      * based on their groups.
-     *
-     * @param string $match
-     * @return bool
      */
-    public function hasPermissionLike($match)
+    public function hasPermissionLike(string $match): bool
     {
         if ($this->isAdmin()) {
             return true;
         }
 
         foreach ($this->getPermissions() as $permission) {
-            if (substr($permission, -strlen($match)) === $match) {
+            if (str_ends_with($permission, $match)) {
                 return true;
             }
         }
@@ -414,39 +367,27 @@ class User extends AbstractModel
     /**
      * Get the notification types that should be alerted to this user, according
      * to their preferences.
-     *
-     * @return array
      */
-    public function getAlertableNotificationTypes()
+    public function getAlertableNotificationTypes(): array
     {
         $types = array_keys(Notification::getSubjectModels());
 
         return array_filter($types, [$this, 'shouldAlert']);
     }
 
-    /**
-     * Get the number of unread notifications for the user.
-     *
-     * @return int
-     */
-    public function getUnreadNotificationCount()
+    public function getUnreadNotificationCount(): int
     {
-        // Cache notification count for 5 minutes to avoid expensive query on every page load
-        // Cache is actively invalidated when notifications are marked as read or created,
-        // so the TTL is mainly a safety net for edge cases (e.g., direct DB updates)
-        $cacheKey = "user.{$this->id}.unread_notification_count";
-
-        return resolve('cache.store')->remember($cacheKey, 300, function () {
+        // Cache for 5 minutes; actively invalidated when notifications are marked read or created.
+        // The TTL is a safety net for edge cases such as direct DB updates.
+        return resolve('cache.store')->remember("user.{$this->id}.unread_notification_count", 300, function () {
             return $this->unreadNotifications()->count();
         });
     }
 
     /**
-     * Return query builder for all notifications that have not been read yet.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<Notification, $this>
      */
-    protected function unreadNotifications()
+    protected function unreadNotifications(): HasMany
     {
         return $this->notifications()
             ->whereIn('type', $this->getAlertableNotificationTypes())
@@ -455,30 +396,22 @@ class User extends AbstractModel
             ->whereSubjectVisibleTo($this);
     }
 
-    /**
-     * Get all notifications that have not been read yet.
-     *
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    protected function getUnreadNotifications()
+    protected function getUnreadNotifications(): Collection
     {
         return $this->unreadNotifications()->get();
     }
 
     /**
      * Get the number of new, unseen notifications for the user.
-     *
-     * @return int
      */
-    public function getNewNotificationCount()
+    public function getNewNotificationCount(): int
     {
-        // Cache notification count for 5 minutes to avoid expensive query on every page load
-        // Cache is actively invalidated when notifications change or user views notifications
-        $cacheKey = "user.{$this->id}.new_notification_count";
-
-        return resolve('cache.store')->remember($cacheKey, 300, function () {
+        // Cache for 5 minutes; actively invalidated when notifications change or user views notifications.
+        return resolve('cache.store')->remember("user.{$this->id}.new_notification_count", 300, function () {
             return $this->unreadNotifications()
-                ->where('created_at', '>', $this->read_notifications_at ?? 0)
+                ->when($this->read_notifications_at, function (Builder|HasMany $query) {
+                    $query->where('created_at', '>', $this->read_notifications_at);
+                })
                 ->count();
         });
     }
@@ -486,11 +419,8 @@ class User extends AbstractModel
     /**
      * Get the values of all registered preferences for this user, by
      * transforming their stored preferences and merging them with the defaults.
-     *
-     * @param string|null $value
-     * @return array
      */
-    public function getPreferencesAttribute($value)
+    public function getPreferencesAttribute(?string $value): array
     {
         $defaults = array_map(function ($value) {
             return $value['default'];
@@ -503,64 +433,43 @@ class User extends AbstractModel
 
     /**
      * Encode an array of preferences for storage in the database.
-     *
-     * @param mixed $value
      */
-    public function setPreferencesAttribute($value)
+    public function setPreferencesAttribute(array $value): void
     {
         $this->attributes['preferences'] = json_encode($value);
     }
 
     /**
-     * Check whether or not the user should receive an alert for a notification
+     * Check whether the user should receive an alert for a notification
      * type.
-     *
-     * @param string $type
-     * @return bool
      */
-    public function shouldAlert($type)
+    public function shouldAlert(string $type): bool
     {
         return (bool) $this->getPreference(static::getNotificationPreferenceKey($type, 'alert'));
     }
 
     /**
-     * Check whether or not the user should receive an email for a notification
+     * Check whether the user should receive an email for a notification
      * type.
-     *
-     * @param string $type
-     * @return bool
      */
-    public function shouldEmail($type)
+    public function shouldEmail(string $type): bool
     {
         return (bool) $this->getPreference(static::getNotificationPreferenceKey($type, 'email'));
     }
 
-    /**
-     * Get the value of a preference for this user.
-     *
-     * @param string $key
-     * @param mixed $default
-     * @return mixed
-     */
-    public function getPreference($key, $default = null)
+    public function getPreference(string $key, mixed $default = null): mixed
     {
         return Arr::get($this->preferences, $key, $default);
     }
 
-    /**
-     * Set the value of a preference for this user.
-     *
-     * @param string $key
-     * @param mixed $value
-     * @return $this
-     */
-    public function setPreference($key, $value)
+    public function setPreference(string $key, mixed $value): static
     {
         if (isset(static::$preferences[$key])) {
             $preferences = $this->preferences;
 
-            if (! is_null($transformer = static::$preferences[$key]['transformer'])) {
-                $preferences[$key] = call_user_func($transformer, $value);
+            $transformer = static::$preferences[$key]['transformer'];
+            if ($transformer !== null) {
+                $preferences[$key] = $transformer($value);
             } else {
                 $preferences[$key] = $value;
             }
@@ -571,38 +480,26 @@ class User extends AbstractModel
         return $this;
     }
 
-    /**
-     * Set the user as being last seen just now.
-     *
-     * @return $this
-     */
-    public function updateLastSeen()
+    public function updateLastSeen(): static
     {
         $now = Carbon::now();
 
-        if ($this->last_seen_at === null || $this->last_seen_at->diffInSeconds($now) > User::LAST_SEEN_UPDATE_DIFF) {
+        if ($this->last_seen_at === null || $this->last_seen_at->diffInSeconds($now, true) > User::LAST_SEEN_UPDATE_DIFF) {
             $this->last_seen_at = $now;
         }
 
         return $this;
     }
 
-    /**
-     * Check whether or not the user is an administrator.
-     *
-     * @return bool
-     */
-    public function isAdmin()
+    public function isAdmin(): bool
     {
         return $this->groups->contains(Group::ADMINISTRATOR_ID);
     }
 
     /**
-     * Check whether or not the user is a guest.
-     *
-     * @return bool
+     * Check whether the user is a guest.
      */
-    public function isGuest()
+    public function isGuest(): bool
     {
         return false;
     }
@@ -615,10 +512,9 @@ class User extends AbstractModel
      * request / operation without a change in permissions (or using another
      * user account) is pointless.
      *
-     * @param bool $condition
      * @throws PermissionDeniedException
      */
-    public function assertPermission($condition)
+    public function assertPermission(bool $condition): void
     {
         if (! $condition) {
             throw new PermissionDeniedException;
@@ -634,7 +530,7 @@ class User extends AbstractModel
      *
      * @throws NotAuthenticatedException
      */
-    public function assertRegistered()
+    public function assertRegistered(): void
     {
         if ($this->isGuest()) {
             throw new NotAuthenticatedException;
@@ -642,11 +538,9 @@ class User extends AbstractModel
     }
 
     /**
-     * @param string $ability
-     * @param mixed $arguments
      * @throws PermissionDeniedException
      */
-    public function assertCan($ability, $arguments = null)
+    public function assertCan(string $ability, mixed $arguments = null): void
     {
         $this->assertPermission(
             $this->can($ability, $arguments)
@@ -656,93 +550,77 @@ class User extends AbstractModel
     /**
      * @throws PermissionDeniedException
      */
-    public function assertAdmin()
+    public function assertAdmin(): void
     {
         $this->assertCan('administrate');
     }
 
     /**
-     * Define the relationship with the user's posts.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<Post, $this>
      */
-    public function posts()
+    public function posts(): HasMany
     {
         return $this->hasMany(Post::class);
     }
 
     /**
-     * Define the relationship with the user's discussions.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<Discussion, $this>
      */
-    public function discussions()
+    public function discussions(): HasMany
     {
         return $this->hasMany(Discussion::class);
     }
 
     /**
-     * Define the relationship with the user's read discussions.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<Discussion>
+     * @return BelongsToMany<Discussion, $this>
      */
-    public function read()
+    public function read(): BelongsToMany
     {
         return $this->belongsToMany(Discussion::class);
     }
 
     /**
-     * Define the relationship with the user's groups.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
+     * @return BelongsToMany<Group, $this>
      */
-    public function groups()
+    public function groups(): BelongsToMany
     {
         return $this->belongsToMany(Group::class);
     }
 
-    public function visibleGroups()
+    public function visibleGroups(): BelongsToMany
     {
         return $this->belongsToMany(Group::class)->where('is_hidden', false);
     }
 
     /**
-     * Define the relationship with the user's notifications.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<Notification, $this>
      */
-    public function notifications()
+    public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);
     }
 
     /**
-     * Define the relationship with the user's email tokens.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<EmailToken, $this>
      */
-    public function emailTokens()
+    public function emailTokens(): HasMany
     {
         return $this->hasMany(EmailToken::class);
     }
 
     /**
-     * Define the relationship with the user's email tokens.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<PasswordToken, $this>
      */
-    public function passwordTokens()
+    public function passwordTokens(): HasMany
     {
         return $this->hasMany(PasswordToken::class);
     }
 
     /**
-     * Define the relationship with the permissions of all of the groups that
+     * Define the relationship with the permissions of all the groups that
      * the user is in.
-     *
-     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function permissions()
+    public function permissions(): Builder
     {
         $groupIds = [Group::GUEST_ID];
 
@@ -758,7 +636,7 @@ class User extends AbstractModel
             $groupIds = $processor($this, $groupIds);
         }
 
-        return Permission::whereIn('group_id', $groupIds);
+        return Permission::query()->whereIn('group_id', $groupIds);
     }
 
     /**
@@ -766,7 +644,7 @@ class User extends AbstractModel
      *
      * @return string[]
      */
-    public function getPermissions()
+    public function getPermissions(): array
     {
         if (is_null($this->permissions)) {
             $this->permissions = $this->permissions()->pluck('permission')->all();
@@ -776,39 +654,27 @@ class User extends AbstractModel
     }
 
     /**
-     * Define the relationship with the user's access tokens.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany<AccessToken, $this>
      */
-    public function accessTokens()
+    public function accessTokens(): HasMany
     {
         return $this->hasMany(AccessToken::class);
     }
 
     /**
-     * Get the user's login providers.
+     * @return HasMany<LoginProvider, $this>
      */
-    public function loginProviders()
+    public function loginProviders(): HasMany
     {
         return $this->hasMany(LoginProvider::class);
     }
 
-    /**
-     * @param string $ability
-     * @param array|mixed $arguments
-     * @return bool
-     */
-    public function can($ability, $arguments = null)
+    public function can(string $ability, mixed $arguments = null): bool
     {
         return static::$gate->allows($this, $ability, $arguments);
     }
 
-    /**
-     * @param string $ability
-     * @param array|mixed $arguments
-     * @return bool
-     */
-    public function cannot($ability, $arguments = null)
+    public function cannot(string $ability, mixed $arguments = null): bool
     {
         return ! $this->can($ability, $arguments);
     }
@@ -816,11 +682,9 @@ class User extends AbstractModel
     /**
      * Set the hasher with which to hash passwords.
      *
-     * @param Hasher $hasher
-     *
      * @internal
      */
-    public static function setHasher(Hasher $hasher)
+    public static function setHasher(Hasher $hasher): void
     {
         static::$hasher = $hasher;
     }
@@ -828,13 +692,9 @@ class User extends AbstractModel
     /**
      * Register a preference with a transformer and a default value.
      *
-     * @param string $key
-     * @param callable $transformer
-     * @param mixed $default
-     *
      * @internal
      */
-    public static function registerPreference($key, callable $transformer = null, $default = null)
+    public static function registerPreference(string $key, ?callable $transformer = null, mixed $default = null): void
     {
         static::$preferences[$key] = compact('transformer', 'default');
     }
@@ -842,35 +702,23 @@ class User extends AbstractModel
     /**
      * Register a callback that processes a user's list of groups.
      *
-     * @param callable $callback
-     * @return void
-     *
      * @internal
      */
-    public static function addGroupProcessor($callback)
+    public static function addGroupProcessor(callable $callback): void
     {
         static::$groupProcessors[] = $callback;
     }
 
     /**
-     * Get the key for a preference which flags whether or not the user will
+     * Get the key for a preference which flags whether the user will
      * receive a notification for $type via $method.
-     *
-     * @param string $type
-     * @param string $method
-     * @return string
      */
-    public static function getNotificationPreferenceKey($type, $method)
+    public static function getNotificationPreferenceKey(string $type, string $method): string
     {
         return 'notify_'.$type.'_'.$method;
     }
 
-    /**
-     * Refresh the user's comments count.
-     *
-     * @return $this
-     */
-    public function refreshCommentCount()
+    public function refreshCommentCount(): static
     {
         $this->comment_count = $this->posts()
             ->where('type', 'comment')
@@ -880,16 +728,21 @@ class User extends AbstractModel
         return $this;
     }
 
-    /**
-     * Refresh the user's comments count.
-     *
-     * @return $this
-     */
-    public function refreshDiscussionCount()
+    public function refreshDiscussionCount(): static
     {
         $this->discussion_count = $this->discussions()
             ->where('is_private', false)
             ->count();
+
+        return $this;
+    }
+
+    /**
+     * Set the value of a notification preference.
+     */
+    public function setNotificationPreference(string $type, string $method, bool $value): static
+    {
+        $this->setPreference(static::getNotificationPreferenceKey($type, $method), $value);
 
         return $this;
     }

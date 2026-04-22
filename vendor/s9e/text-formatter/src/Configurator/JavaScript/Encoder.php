@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\JavaScript;
@@ -11,7 +11,6 @@ use RuntimeException;
 use s9e\TextFormatter\Configurator\Items\Regexp;
 use s9e\TextFormatter\Configurator\JavaScript\Code;
 use s9e\TextFormatter\Configurator\JavaScript\Dictionary;
-use s9e\TextFormatter\Configurator\JavaScript\Encoder;
 
 class Encoder
 {
@@ -34,18 +33,18 @@ class Encoder
 	{
 		$ns = 's9e\\TextFormatter\\Configurator\\';
 		$this->objectEncoders = [
-			$ns . 'Items\\Regexp'           => [$this, 'encodeRegexp'],
-			$ns . 'JavaScript\\Code'        => [$this, 'encodeCode'],
-			$ns . 'JavaScript\\ConfigValue' => [$this, 'encodeConfigValue'],
-			$ns . 'JavaScript\\Dictionary'  => [$this, 'encodeDictionary']
+			$ns . 'Items\\Regexp'           => $this->encodeRegexp(...),
+			$ns . 'JavaScript\\Code'        => $this->encodeCode(...),
+			$ns . 'JavaScript\\ConfigValue' => $this->encodeConfigValue(...),
+			$ns . 'JavaScript\\Dictionary'  => $this->encodeDictionary(...)
 		];
 		$this->typeEncoders = [
-			'array'   => [$this, 'encodeArray'],
-			'boolean' => [$this, 'encodeBoolean'],
-			'double'  => [$this, 'encodeScalar'],
-			'integer' => [$this, 'encodeScalar'],
-			'object'  => [$this, 'encodeObject'],
-			'string'  => [$this, 'encodeScalar']
+			'array'   => $this->encodeArray(...),
+			'boolean' => $this->encodeBoolean(...),
+			'double'  => $this->encodeScalar(...),
+			'integer' => $this->encodeScalar(...),
+			'object'  => $this->encodeObject(...),
+			'string'  => $this->encodeScalar(...)
 		];
 	}
 
@@ -151,7 +150,7 @@ class Encoder
 	*/
 	protected function encodeIndexedArray(array $array)
 	{
-		return '[' . implode(',', array_map([$this, 'encode'], $array)) . ']';
+		return '[' . implode(',', array_map($this->encode(...), $array)) . ']';
 	}
 
 	/**

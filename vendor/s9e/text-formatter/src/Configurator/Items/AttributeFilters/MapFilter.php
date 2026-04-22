@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\Items\AttributeFilters;
@@ -20,7 +20,7 @@ class MapFilter extends AbstractMapFilter
 	* @param  bool  $caseSensitive Whether this map is case-sensitive
 	* @param  bool  $strict        Whether this map is strict (values with no match are invalid)
 	*/
-	public function __construct(array $map = null, $caseSensitive = false, $strict = false)
+	public function __construct(?array $map = null, $caseSensitive = false, $strict = false)
 	{
 		parent::__construct('s9e\\TextFormatter\\Parser\\AttributeFilters\\MapFilter::filter');
 

@@ -13,6 +13,7 @@ use Flarum\Install\AdminUser;
 use Flarum\Install\BaseUrl;
 use Flarum\Install\DatabaseConfig;
 use Flarum\Install\Installation;
+use Flarum\Install\ValidationFailed;
 use Illuminate\Support\Str;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputInterface;
@@ -21,20 +22,13 @@ use Symfony\Component\Console\Question\Question;
 
 class UserDataProvider implements DataProviderInterface
 {
-    protected $input;
+    protected BaseUrl $baseUrl;
 
-    protected $output;
-
-    protected $questionHelper;
-
-    /** @var BaseUrl */
-    protected $baseUrl;
-
-    public function __construct(InputInterface $input, OutputInterface $output, QuestionHelper $questionHelper)
-    {
-        $this->input = $input;
-        $this->output = $output;
-        $this->questionHelper = $questionHelper;
+    public function __construct(
+        protected InputInterface $input,
+        protected OutputInterface $output,
+        protected QuestionHelper $questionHelper
+    ) {
     }
 
     public function configure(Installation $installation): Installation
@@ -49,21 +43,43 @@ class UserDataProvider implements DataProviderInterface
 
     private function getDatabaseConfiguration(): DatabaseConfig
     {
-        $host = $this->ask('Database host (required):');
-        $port = 3306;
+        $driver = $this->ask('Database driver (mysql, mariadb, sqlite, pgsql) (Default: mysql):', 'mysql');
+        $port = match ($driver) {
+            'mysql', 'mariadb' => 3306,
+            'pgsql' => 5432,
+            default => 0,
+        };
 
-        if (Str::contains($host, ':')) {
-            list($host, $port) = explode(':', $host, 2);
+        if (in_array($driver, ['mysql', 'mariadb', 'pgsql'])) {
+            $host = $this->ask('Database host (required):', required: true);
+
+            if (Str::contains($host, ':')) {
+                [$host, $port] = explode(':', $host, 2);
+            }
         }
 
+        $database = $this->ask('Database name (required):', required: true);
+
+        if ($driver === 'pgsql') {
+            $schema = $this->ask('Schema (Default: public):', 'public');
+        }
+
+        if (in_array($driver, ['mysql', 'mariadb', 'pgsql'])) {
+            $user = $this->ask('Database user (required):', required: true);
+            $password = $this->secret('Database password:');
+        }
+
+        $prefix = $this->ask('Prefix:');
+
         return new DatabaseConfig(
-            'mysql',
-            $host,
+            $driver,
+            $host ?? null,
             intval($port),
-            $this->ask('Database name (required):'),
-            $this->ask('Database user (required):'),
-            $this->secret('Database password:'),
-            $this->ask('Prefix:')
+            $database,
+            $schema ?? null,
+            $user ?? null,
+            $password ?? null,
+            $prefix ?? null
         );
     }
 
@@ -79,11 +95,11 @@ class UserDataProvider implements DataProviderInterface
         return new AdminUser(
             $this->ask('Admin username (Default: admin):', 'admin'),
             $this->askForAdminPassword(),
-            $this->ask('Admin email address (required):')
+            $this->ask('Admin email address (required):', required: true)
         );
     }
 
-    private function askForAdminPassword()
+    private function askForAdminPassword(): string
     {
         while (true) {
             $password = $this->secret('Admin password (required >= 8 characters):');
@@ -104,7 +120,7 @@ class UserDataProvider implements DataProviderInterface
         }
     }
 
-    private function getSettings()
+    private function getSettings(): array
     {
         $title = $this->ask('Forum title:');
 
@@ -115,14 +131,24 @@ class UserDataProvider implements DataProviderInterface
         ];
     }
 
-    private function ask($question, $default = null)
+    private function ask(string $question, ?string $default = null, bool $required = false): mixed
     {
         $question = new Question("<question>$question</question> ", $default);
+
+        if ($required) {
+            $question->setValidator(function ($value) {
+                if (empty($value)) {
+                    throw new ValidationFailed('This value is required');
+                }
+
+                return $value;
+            });
+        }
 
         return $this->questionHelper->ask($this->input, $this->output, $question);
     }
 
-    private function secret($question)
+    private function secret(string $question): mixed
     {
         $question = new Question("<question>$question</question> ");
 
@@ -131,7 +157,7 @@ class UserDataProvider implements DataProviderInterface
         return $this->questionHelper->ask($this->input, $this->output, $question);
     }
 
-    private function validationError($message)
+    private function validationError(string $message): void
     {
         $this->output->writeln("<error>$message</error>");
         $this->output->writeln('Please try again.');

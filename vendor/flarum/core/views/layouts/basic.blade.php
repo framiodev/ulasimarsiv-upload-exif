@@ -6,9 +6,8 @@
 <html>
   <head>
     <meta charset="utf-8">
-    {{-- TODO: Change below to @hasSection when Laravel is upgraded --}}
-    <title>@if ($__env->hasSection('title')) @yield('title') - @endif{{ $settings->get('forum_title') }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1">
+    <title>@hasSection('title') @yield('title') - @endif{{ $settings->get('forum_title') }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
       * {

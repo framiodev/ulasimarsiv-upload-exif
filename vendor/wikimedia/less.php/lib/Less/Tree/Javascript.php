@@ -1,19 +1,23 @@
 <?php
 /**
  * @private
+ * @see less-3.13.1.js#JavaScript.prototype
  */
-class Less_Tree_Javascript extends Less_Tree {
+class Less_Tree_JavaScript extends Less_Tree {
 
-	public $type = 'Javascript';
+	/** @var bool */
 	public $escaped;
+	/** @var string */
 	public $expression;
+	/** @var int */
 	public $index;
 
 	/**
-	 * @param bool $index
+	 * @param string $string
 	 * @param bool $escaped
+	 * @param int $index
 	 */
-	public function __construct( $string, $index, $escaped ) {
+	public function __construct( $string, $escaped, $index ) {
 		$this->escaped = $escaped;
 		$this->expression = $string;
 		$this->index = $index;

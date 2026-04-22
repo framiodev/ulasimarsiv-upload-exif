@@ -19,7 +19,7 @@ class RefreshAnnouncementsCommand extends Command
     protected $signature = 'announcements:refresh';
     protected $description = 'Fetch and cache the latest announcements from discuss.flarum.org.';
 
-    public function handle(CacheRepository $cache, AnnouncementsFetcher $fetcher)
+    public function handle(CacheRepository $cache, AnnouncementsFetcher $fetcher): int
     {
         $this->info('Fetching announcements from discuss.flarum.org...');
 
@@ -31,7 +31,7 @@ class RefreshAnnouncementsCommand extends Command
             return self::FAILURE;
         }
 
-        $cache->put(ListAnnouncementsController::CACHE_KEY, $announcements, ListAnnouncementsController::CACHE_TTL);
+        $cache->put(ListAnnouncementsController::CACHE_KEY, $announcements, ListAnnouncementsController::CACHE_STALE_TTL);
 
         $this->info('Cached '.count($announcements).' announcements.');
 

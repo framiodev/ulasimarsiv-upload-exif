@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Renderers;
@@ -44,12 +44,7 @@ class XSLT extends Renderer
 		}
 	}
 
-	/**
-	* Serializer
-	*
-	* @return string[] List of properties to serialize
-	*/
-	public function __sleep()
+	public function __serialize(): array
 	{
 		$props = get_object_vars($this);
 		unset($props['proc']);
@@ -59,18 +54,15 @@ class XSLT extends Renderer
 			unset($props['reloadParams']);
 		}
 
-		return array_keys($props);
+		return $props;
 	}
 
-	/**
-	* Unserialize helper
-	*
-	* Will reload parameters if they were changed between generation and serialization
-	*
-	* @return void
-	*/
-	public function __wakeup()
+	public function __unserialize(array $data): void
 	{
+		foreach ($data as $k => $v)
+		{
+			$this->$k = $v;
+		}
 		if (!empty($this->reloadParams))
 		{
 			$this->setParameters($this->params);
@@ -180,7 +172,7 @@ class XSLT extends Renderer
 	*/
 	protected function normalizeAttributes($html)
 	{
-		return preg_replace_callback('(<\\S++ [^>]++>)', [$this, 'normalizeElement'], $html);
+		return preg_replace_callback('(<\\S++ [^>]++>)', $this->normalizeElement(...), $html);
 	}
 
 	/**
@@ -196,6 +188,6 @@ class XSLT extends Renderer
 			return $m[0];
 		}
 
-		return preg_replace_callback('((?:"[^"]*"|\'[^\']*\'))S', [$this, 'normalizeAttribute'], $m[0]);
+		return preg_replace_callback('((?:"[^"]*"|\'[^\']*\'))S', $this->normalizeAttribute(...), $m[0]);
 	}
 }

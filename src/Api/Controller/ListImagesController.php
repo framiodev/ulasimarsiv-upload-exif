@@ -1,5 +1,5 @@
 <?php
-namespace UlasimInfo\UploadExif\Api\Controller;
+namespace UlasimArsiv\UploadExif\Api\Controller;
 
 use Flarum\Http\RequestUtil;
 use Flarum\Api\Controller\AbstractListController;
@@ -9,8 +9,8 @@ use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Arr;
 
 class ListImagesController extends AbstractListController {
-    // Serializer UlasimInfo namespace'ine göre ayarlandı
-    public $serializer = 'UlasimInfo\UploadExif\Api\Serializer\SpotterImageSerializer';
+    // Serializer UlasimArsiv namespace'ine göre ayarlandı
+    public $serializer = 'UlasimArsiv\UploadExif\Api\Serializer\SpotterImageSerializer';
     public $include = ['user'];
 
     protected $db;

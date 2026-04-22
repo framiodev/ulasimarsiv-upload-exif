@@ -14,12 +14,8 @@ use Illuminate\Support\Str;
 
 class WritablePaths implements PrerequisiteInterface
 {
-    /**
-     * @var Collection
-     */
-    private $paths;
-
-    private $wildcards = [];
+    private Collection $paths;
+    private array $wildcards = [];
 
     public function __construct(array $paths)
     {
@@ -58,24 +54,24 @@ class WritablePaths implements PrerequisiteInterface
             });
     }
 
-    private function getAbsolutePath($path)
+    private function getAbsolutePath(string $path): string
     {
         $path = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
         $parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), 'strlen');
         $absolutes = [];
 
         foreach ($parts as $part) {
-            if ('.' == $part) {
+            if ($part === '.') {
                 continue;
             }
-            if ('..' == $part) {
+            if ($part === '..') {
                 array_pop($absolutes);
             } else {
                 $absolutes[] = $part;
             }
         }
 
-        return (substr($path, 0, 1) == '/' ? '/' : '').implode(DIRECTORY_SEPARATOR, $absolutes);
+        return (str_starts_with($path, '/') ? '/' : '').implode(DIRECTORY_SEPARATOR, $absolutes);
     }
 
     private function normalize(array $paths): Collection

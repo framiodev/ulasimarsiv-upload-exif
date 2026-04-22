@@ -15,36 +15,21 @@ use Flarum\Install\AdminUser;
 use Flarum\Install\Step;
 use Illuminate\Database\ConnectionInterface;
 
-class CreateAdminUser implements Step
+readonly class CreateAdminUser implements Step
 {
-    /**
-     * @var ConnectionInterface
-     */
-    private $database;
-
-    /**
-     * @var AdminUser
-     */
-    private $admin;
-
-    /**
-     * @var string|null
-     */
-    private $accessToken;
-
-    public function __construct(ConnectionInterface $database, AdminUser $admin, string $accessToken = null)
-    {
-        $this->database = $database;
-        $this->admin = $admin;
-        $this->accessToken = $accessToken;
+    public function __construct(
+        private ConnectionInterface $database,
+        private AdminUser $admin,
+        #[\SensitiveParameter] private ?string $accessToken = null
+    ) {
     }
 
-    public function getMessage()
+    public function getMessage(): string
     {
         return 'Creating admin user '.$this->admin->getUsername();
     }
 
-    public function run()
+    public function run(): void
     {
         $uid = $this->database->table('users')->insertGetId(
             $this->admin->getAttributes()

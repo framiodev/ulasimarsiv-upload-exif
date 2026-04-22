@@ -13,13 +13,8 @@ use Flarum\Http\AccessToken;
 
 class DeveloperTokenCreated
 {
-    /**
-     * @var AccessToken
-     */
-    public $token;
-
-    public function __construct(AccessToken $token)
-    {
-        $this->token = $token;
+    public function __construct(
+        #[\SensitiveParameter] public AccessToken $token
+    ) {
     }
 }

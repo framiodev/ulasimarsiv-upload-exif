@@ -10,90 +10,87 @@
 namespace Flarum\Install;
 
 use Flarum\Foundation\Paths;
+use Illuminate\Database\ConnectionInterface;
 
 class Installation
 {
-    /**
-     * @var Paths
-     */
-    private $paths;
-
-    private $configPath;
-    private $debug = false;
-    private $baseUrl;
-    private $customSettings = [];
-    private $enabledExtensions = null;
-
-    /** @var DatabaseConfig */
-    private $dbConfig;
-
-    /** @var AdminUser */
-    private $adminUser;
-
-    private $accessToken;
+    private ?string $configPath = null;
+    private bool $debug = false;
+    private BaseUrl $baseUrl;
+    private array $customSettings = [];
+    private ?array $enabledExtensions = null;
+    private DatabaseConfig $dbConfig;
+    private AdminUser $adminUser;
+    private ?string $accessToken = null;
+    private array $queueConfig = ['driver' => 'sync'];
 
     // A few instance variables to persist objects between steps.
     // Could also be local variables in build(), but this way
     // access in closures is easier. :)
+    private ConnectionInterface $db;
 
-    /** @var \Illuminate\Database\ConnectionInterface */
-    private $db;
-
-    public function __construct(Paths $paths)
-    {
-        $this->paths = $paths;
+    public function __construct(
+        private readonly Paths $paths
+    ) {
     }
 
-    public function configPath($path)
+    public function configPath(?string $path): self
     {
         $this->configPath = $path;
 
         return $this;
     }
 
-    public function debugMode($flag)
+    public function debugMode(bool $flag): self
     {
         $this->debug = $flag;
 
         return $this;
     }
 
-    public function databaseConfig(DatabaseConfig $dbConfig)
+    public function databaseConfig(DatabaseConfig $dbConfig): self
     {
         $this->dbConfig = $dbConfig;
 
         return $this;
     }
 
-    public function baseUrl(BaseUrl $baseUrl)
+    public function baseUrl(BaseUrl $baseUrl): self
     {
         $this->baseUrl = $baseUrl;
 
         return $this;
     }
 
-    public function settings($settings)
+    public function settings(array $settings): self
     {
         $this->customSettings = $settings;
 
         return $this;
     }
 
-    public function extensions($enabledExtensions)
+    public function queueConfig(array $queue): self
+    {
+        $this->queueConfig = $queue;
+
+        return $this;
+    }
+
+    public function extensions(?array $enabledExtensions): self
     {
         $this->enabledExtensions = $enabledExtensions;
 
         return $this;
     }
 
-    public function adminUser(AdminUser $admin)
+    public function adminUser(AdminUser $admin): self
     {
         $this->adminUser = $admin;
 
         return $this;
     }
 
-    public function accessToken(string $token)
+    public function accessToken(#[\SensitiveParameter] string $token): self
     {
         $this->accessToken = $token;
 
@@ -103,15 +100,17 @@ class Installation
     public function prerequisites(): Prerequisite\PrerequisiteInterface
     {
         return new Prerequisite\Composite(
-            new Prerequisite\PhpVersion('7.2.0'),
+            new Prerequisite\PhpVersion('8.3.0'),
             new Prerequisite\PhpExtensions([
                 'dom',
+                'fileinfo',
                 'gd',
                 'json',
                 'mbstring',
                 'openssl',
                 'pdo_mysql',
                 'tokenizer',
+                'zip',
             ]),
             new Prerequisite\WritablePaths([
                 $this->paths->base,
@@ -125,12 +124,15 @@ class Installation
     {
         $pipeline = new Pipeline;
 
+        $this->dbConfig->prepare($this->paths);
+
         $pipeline->pipe(function () {
             return new Steps\ConnectToDatabase(
                 $this->dbConfig,
                 function ($connection) {
                     $this->db = $connection;
-                }
+                },
+                $this->paths->base
             );
         });
 
@@ -139,12 +141,13 @@ class Installation
                 $this->debug,
                 $this->dbConfig,
                 $this->baseUrl,
-                $this->getConfigPath()
+                $this->getConfigPath(),
+                $this->queueConfig
             );
         });
 
         $pipeline->pipe(function () {
-            return new Steps\RunMigrations($this->db, $this->getMigrationPath());
+            return new Steps\RunMigrations($this->db, $this->dbConfig, $this->getMigrationPath());
         });
 
         $pipeline->pipe(function () {
@@ -166,17 +169,17 @@ class Installation
         return $pipeline;
     }
 
-    private function getConfigPath()
+    private function getConfigPath(): string
     {
         return $this->paths->base.'/'.($this->configPath ?? 'config.php');
     }
 
-    private function getAssetPath()
+    private function getAssetPath(): string
     {
         return $this->paths->public.'/assets';
     }
 
-    private function getMigrationPath()
+    private function getMigrationPath(): string
     {
         return __DIR__.'/../../migrations';
     }

@@ -16,66 +16,30 @@ use Flarum\Foundation\ApplicationInfoProvider;
 use Flarum\Foundation\Config;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Illuminate\Database\ConnectionInterface;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Helper\TableStyle;
 
 class InfoCommand extends AbstractCommand
 {
-    /**
-     * @var ExtensionManager
-     */
-    protected $extensions;
-
-    /**
-     * @var Config
-     */
-    protected $config;
-
-    /**
-     * @var SettingsRepositoryInterface
-     */
-    protected $settings;
-
-    /**
-     * @var ConnectionInterface
-     */
-    protected $db;
-
-    /**
-     * @var ApplicationInfoProvider
-     */
-    private $appInfo;
-
     public function __construct(
-        ExtensionManager $extensions,
-        Config $config,
-        SettingsRepositoryInterface $settings,
-        ConnectionInterface $db,
-        ApplicationInfoProvider $appInfo
+        protected ExtensionManager $extensions,
+        protected Config $config,
+        protected SettingsRepositoryInterface $settings,
+        protected ConnectionInterface $db,
+        protected ApplicationInfoProvider $appInfo
     ) {
-        $this->extensions = $extensions;
-        $this->config = $config;
-        $this->settings = $settings;
-        $this->db = $db;
-        $this->appInfo = $appInfo;
-
         parent::__construct();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('info')
             ->setDescription("Gather information about Flarum's core and installed extensions");
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function fire()
+    protected function fire(): int
     {
         $coreVersion = $this->findPackageVersion(__DIR__.'/../../../', Application::VERSION);
         $this->output->writeln("<info>Flarum core:</info> $coreVersion");
@@ -102,7 +66,7 @@ class InfoCommand extends AbstractCommand
             $this->output->writeln("<info>PHP memory limit:</info> CLI: {$cliMemoryLimit}, Web: unable to detect");
         }
 
-        $this->output->writeln('<info>MySQL version:</info> '.$this->appInfo->identifyDatabaseVersion());
+        $this->output->writeln('<info>'.$this->appInfo->identifyDatabaseDriver().' version:</info> '.$this->appInfo->identifyDatabaseVersion());
 
         $phpExtensions = implode(', ', get_loaded_extensions());
         $this->output->writeln("<info>Loaded extensions:</info> $phpExtensions");
@@ -127,9 +91,11 @@ class InfoCommand extends AbstractCommand
                 "Don't forget to turn off debug mode! It should never be turned on in a production system."
             );
         }
+
+        return Command::SUCCESS;
     }
 
-    private function getExtensionTable()
+    private function getExtensionTable(): Table
     {
         $table = (new Table($this->output))
             ->setHeaders([
@@ -178,6 +144,32 @@ class InfoCommand extends AbstractCommand
     }
 
     /**
+     * Try to detect a package's exact version.
+     *
+     * If the package seems to be a Git version, we extract the currently
+     * checked out commit using the command line.
+     */
+    private function findPackageVersion(string $path, ?string $fallback = null): ?string
+    {
+        if (file_exists("$path/.git")) {
+            $cwd = getcwd();
+            chdir($path);
+
+            $output = [];
+            $status = null;
+            exec('git rev-parse HEAD 2>&1', $output, $status);
+
+            chdir($cwd);
+
+            if ($status === 0) {
+                return isset($fallback) ? "$fallback ($output[0])" : $output[0];
+            }
+        }
+
+        return $fallback;
+    }
+
+    /**
      * Try to detect the web server's PHP version.
      * This is a best-effort attempt and may not work in all environments.
      */
@@ -192,7 +184,7 @@ class InfoCommand extends AbstractCommand
         ];
 
         foreach ($possiblePhpBinaries as $phpBinary) {
-            if (@file_exists($phpBinary) && @is_executable($phpBinary)) {
+            if (file_exists($phpBinary) && is_executable($phpBinary)) {
                 $output = [];
                 $status = null;
                 exec("$phpBinary -v 2>&1 | head -n 1", $output, $status);
@@ -234,16 +226,16 @@ class InfoCommand extends AbstractCommand
         ];
 
         foreach ($possiblePaths as $path) {
-            if (@file_exists($path) && @is_readable($path)) {
-                $content = @file_get_contents($path);
+            if (file_exists($path) && is_readable($path)) {
+                $content = file_get_contents($path);
 
                 // Look for memory_limit setting
-                if ($content && preg_match('/^\s*memory_limit\s*=\s*(.+?)\s*$/m', $content, $matches)) {
+                if (preg_match('/^\s*memory_limit\s*=\s*(.+?)\s*$/m', $content, $matches)) {
                     return trim($matches[1]);
                 }
 
                 // For FPM pool configs, also check php_admin_value
-                if ($content && preg_match('/^\s*php_admin_value\[memory_limit\]\s*=\s*(.+?)\s*$/m', $content, $matches)) {
+                if (preg_match('/^\s*php_admin_value\[memory_limit\]\s*=\s*(.+?)\s*$/m', $content, $matches)) {
                     return trim($matches[1]);
                 }
             }
@@ -251,13 +243,13 @@ class InfoCommand extends AbstractCommand
 
         // Also scan /usr/local/etc/php/conf.d/ directory for any INI files with memory_limit
         $confDir = '/usr/local/etc/php/conf.d';
-        if (@is_dir($confDir) && @is_readable($confDir)) {
-            $iniFiles = @glob($confDir.'/*.ini');
+        if (is_dir($confDir) && is_readable($confDir)) {
+            $iniFiles = glob($confDir.'/*.ini');
             if ($iniFiles) {
                 foreach ($iniFiles as $iniFile) {
-                    if (@is_readable($iniFile)) {
-                        $content = @file_get_contents($iniFile);
-                        if ($content && preg_match('/^\s*memory_limit\s*=\s*(.+?)\s*$/m', $content, $matches)) {
+                    if (is_readable($iniFile)) {
+                        $content = file_get_contents($iniFile);
+                        if (preg_match('/^\s*memory_limit\s*=\s*(.+?)\s*$/m', $content, $matches)) {
                             return trim($matches[1]);
                         }
                     }
@@ -266,31 +258,5 @@ class InfoCommand extends AbstractCommand
         }
 
         return null;
-    }
-
-    /**
-     * Try to detect a package's exact version.
-     *
-     * If the package seems to be a Git version, we extract the currently
-     * checked out commit using the command line.
-     */
-    private function findPackageVersion(string $path, string $fallback = null): ?string
-    {
-        if (file_exists("$path/.git")) {
-            $cwd = getcwd();
-            chdir($path);
-
-            $output = [];
-            $status = null;
-            exec('git rev-parse HEAD 2>&1', $output, $status);
-
-            chdir($cwd);
-
-            if ($status == 0) {
-                return isset($fallback) ? "$fallback ($output[0])" : $output[0];
-            }
-        }
-
-        return $fallback;
     }
 }

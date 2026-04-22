@@ -2,34 +2,16 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Plugins\MediaEmbed\Configurator;
 
-use function strtolower;
-use s9e\TextFormatter\Configurator;
+use s9e\TextFormatter\Plugins\MediaEmbed\Configurator\SiteHelpers\MastodonHelper as ParentClass;
 
-class MastodonHelper
+/**
+* @deprecated 2.18.0 Use s9e\TextFormatter\Plugins\MediaEmbed\Configurator\SiteHelpers\MastodonHelper instead
+*/
+class MastodonHelper extends ParentClass
 {
-	/**
-	* @var Configurator
-	*/
-	protected Configurator $configurator;
-
-	public function __construct(Configurator $configurator)
-	{
-		$this->configurator = $configurator;
-	}
-
-	public function addHost(string $host): void
-	{
-		if (!isset($this->configurator->registeredVars['MediaEmbed.sites']['mastodon']))
-		{
-			$this->configurator->MediaEmbed->add('mastodon');
-		}
-
-		$host = strtolower($host);
-		$this->configurator->registeredVars['MediaEmbed.hosts'][$host] = 'mastodon';
-	}
 }

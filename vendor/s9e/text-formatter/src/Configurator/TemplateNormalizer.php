@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license'); The MIT License
 */
 namespace s9e\TextFormatter\Configurator;
@@ -73,6 +73,7 @@ class TemplateNormalizer implements ArrayAccess, Iterator
 		'InlineXPathLiterals',
 		'DeoptimizeIf',
 		'OptimizeChooseDeadBranches',
+		'OptimizeChooseAttributes',
 		'OptimizeChooseText',
 		'OptimizeChoose',
 		'OptimizeConditionalValueOf',
@@ -96,7 +97,7 @@ class TemplateNormalizer implements ArrayAccess, Iterator
 	*
 	* @param array $normalizations List of normalizations
 	*/
-	public function __construct(array $normalizations = null)
+	public function __construct(?array $normalizations = null)
 	{
 		if (!isset($normalizations))
 		{

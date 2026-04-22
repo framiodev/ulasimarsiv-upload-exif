@@ -11,37 +11,20 @@ namespace Flarum\Notification\Command;
 
 use Flarum\Notification\Event\DeletedAll;
 use Flarum\Notification\NotificationRepository;
-use Flarum\User\Exception\NotAuthenticatedException;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Carbon;
 
 class DeleteAllNotificationsHandler
 {
-    /**
-     * @var NotificationRepository
-     */
-    protected $notifications;
-
-    /**
-     * @var Dispatcher
-     */
-    protected $events;
-
-    /**
-     * @param NotificationRepository $notifications
-     * @param Dispatcher $events
-     */
-    public function __construct(NotificationRepository $notifications, Dispatcher $events)
-    {
-        $this->notifications = $notifications;
-        $this->events = $events;
+    public function __construct(
+        protected NotificationRepository $notifications,
+        protected Dispatcher $events,
+        protected CacheRepository $cache
+    ) {
     }
 
-    /**
-     * @param DeleteAllNotifications $command
-     * @throws NotAuthenticatedException
-     */
-    public function handle(DeleteAllNotifications $command)
+    public function handle(DeleteAllNotifications $command): void
     {
         $actor = $command->actor;
 
@@ -50,9 +33,8 @@ class DeleteAllNotificationsHandler
         $this->notifications->deleteAll($actor);
 
         // Invalidate notification count caches
-        $cache = resolve('cache.store');
-        $cache->forget("user.{$actor->id}.unread_notification_count");
-        $cache->forget("user.{$actor->id}.new_notification_count");
+        $this->cache->forget("user.{$actor->id}.unread_notification_count");
+        $this->cache->forget("user.{$actor->id}.new_notification_count");
 
         $this->events->dispatch(new DeletedAll($actor, Carbon::now()));
     }

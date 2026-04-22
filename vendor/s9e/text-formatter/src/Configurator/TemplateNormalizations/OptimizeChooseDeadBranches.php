@@ -2,12 +2,12 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\TemplateNormalizations;
 
-use DOMElement;
+use s9e\SweetDOM\Element;
 
 class OptimizeChooseDeadBranches extends AbstractChooseOptimization
 {
@@ -42,18 +42,13 @@ class OptimizeChooseDeadBranches extends AbstractChooseOptimization
 	/**
 	* Convert given xsl:when element into an xsl:otherwise element
 	*
-	* @param  DOMElement $when
+	* @param  Element $when
 	* @return void
 	*/
-	protected function makeOtherwise(DOMElement $when)
+	protected function makeOtherwise(Element $when)
 	{
-		$otherwise = $this->createElement('xsl:otherwise');
-		while ($when->firstChild)
-		{
-			$otherwise->appendChild($when->firstChild);
-		}
-
-		$when->parentNode->replaceChild($otherwise, $when);
+		$otherwise = $when->replaceWithXslOtherwise();
+		$otherwise->append(...$when->childNodes);
 	}
 
 	/**
@@ -69,7 +64,7 @@ class OptimizeChooseDeadBranches extends AbstractChooseOptimization
 
 			if ($removeAll || isset($tests[$test]) || $this->isAlwaysFalse($test))
 			{
-				$branch->parentNode->removeChild($branch);
+				$branch->remove();
 			}
 			elseif ($this->isAlwaysTrue($test))
 			{

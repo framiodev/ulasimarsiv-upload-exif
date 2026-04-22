@@ -18,27 +18,18 @@ use RuntimeException;
 
 class AnnouncementsFetcher
 {
+    private Client $client;
+
+    public function __construct(
+        protected ApplicationInfoProvider $appInfo
+    ) {
+        $this->client = new Client(['timeout' => 10]);
+    }
     protected const API_BASE_URL = 'https://discuss.flarum.org/api/discussions';
     protected const TAG = 'blog';
     protected const LIMIT = 8;
     protected const FETCH_LIMIT = 20;
     protected const EXCERPT_LENGTH = 200;
-
-    /**
-     * @var ApplicationInfoProvider
-     */
-    protected $appInfo;
-
-    /**
-     * @var Client
-     */
-    private $client;
-
-    public function __construct(ApplicationInfoProvider $appInfo)
-    {
-        $this->appInfo = $appInfo;
-        $this->client = new Client(['timeout' => 10]);
-    }
 
     public function fetch(): array
     {
@@ -55,7 +46,7 @@ class AnnouncementsFetcher
                     'Accept' => 'application/json',
                     'User-Agent' => 'Flarum/'.Application::VERSION
                         .' PHP/'.$this->appInfo->identifyPHPVersion()
-                        .' Database/'.$this->appInfo->identifyDatabaseVersion(),
+                        .' Database/'.$this->appInfo->identifyDatabaseDriver().'/'.$this->appInfo->identifyDatabaseVersion(),
                 ],
             ]);
         } catch (GuzzleException $e) {
@@ -110,9 +101,7 @@ class AnnouncementsFetcher
             ];
         }
 
-        usort($items, function (array $a, array $b) {
-            return $b['isSticky'] <=> $a['isSticky'];
-        });
+        usort($items, fn (array $a, array $b) => $b['isSticky'] <=> $a['isSticky']);
 
         return array_slice($items, 0, self::LIMIT);
     }

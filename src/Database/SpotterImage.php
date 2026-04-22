@@ -1,6 +1,6 @@
 <?php
 
-namespace UlasimInfo\UploadExif\Database;
+namespace UlasimArsiv\UploadExif\Database;
 
 use Flarum\Database\AbstractModel;
 use Flarum\User\User;

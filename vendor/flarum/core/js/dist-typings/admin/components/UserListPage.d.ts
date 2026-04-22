@@ -1,4 +1,3 @@
-/// <reference path="../../@types/translator-icu-rich.d.ts" />
 import Mithril from 'mithril';
 import type User from '../../common/models/User';
 import type { IPageAttrs } from '../../common/components/Page';
@@ -50,10 +49,6 @@ export default class UserListPage extends AdminPage {
      * `undefined` when page loads as no data has been fetched.
      */
     private pageData;
-    /**
-     * Are there more users available?
-     */
-    private moreData;
     private isLoadingPage;
     oninit(vnode: Mithril.Vnode<IPageAttrs, this>): void;
     /**
@@ -73,13 +68,13 @@ export default class UserListPage extends AdminPage {
      * See `UserListPage.tsx` for examples.
      */
     columns(): ItemList<ColumnData>;
+    userActionItems(user: User): ItemList<Mithril.Children>;
     headerInfo(): {
         className: string;
         icon: string;
-        title: import("@askvortsov/rich-icu-message-formatter").NestedStringArray;
-        description: import("@askvortsov/rich-icu-message-formatter").NestedStringArray;
+        title: string | any[];
+        description: string | any[];
     };
-    userActionItems(user: User): ItemList<Mithril.Children>;
     /**
      * Asynchronously fetch the next set of users to be rendered.
      *
@@ -90,8 +85,6 @@ export default class UserListPage extends AdminPage {
      * @param pageNumber The **zero-based** page number to load and display
      */
     loadPage(pageNumber: number): Promise<void>;
-    nextPage(): void;
-    previousPage(): void;
     /**
      * @param page The **1-based** page number
      */

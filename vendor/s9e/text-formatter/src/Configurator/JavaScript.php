@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator;
@@ -136,7 +136,7 @@ class JavaScript
 	* @param  array  $config Config array returned by the configurator
 	* @return string         JavaScript parser
 	*/
-	public function getParser(array $config = null)
+	public function getParser(?array $config = null)
 	{
 		$this->configOptimizer->reset();
 
@@ -378,7 +378,7 @@ class JavaScript
 		$src     = '';
 
 		// If getLogger() is not exported we use a dummy Logger that can be optimized away
-		$logger = (in_array('getLogger', $this->exports)) ? 'Logger.js' : 'NullLogger.js';
+		$logger = (in_array('getLogger', $this->exports, true)) ? 'Logger.js' : 'NullLogger.js';
 
 		// Prepare the list of files
 		$files   = glob($rootDir . '/Parser/AttributeFilters/*.js');
@@ -443,7 +443,7 @@ class JavaScript
 	protected function injectConfig($src)
 	{
 		$config = array_map(
-			[$this, 'encode'],
+			$this->encode(...),
 			$this->configOptimizer->optimize(
 				[
 					'plugins'        => $this->getPluginsConfig(),

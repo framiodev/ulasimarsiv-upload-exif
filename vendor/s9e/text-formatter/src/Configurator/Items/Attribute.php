@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Configurator\Items;
@@ -44,7 +44,7 @@ class Attribute implements ConfigProvider
 	*
 	* @param array $options This attribute's options
 	*/
-	public function __construct(array $options = null)
+	public function __construct(?array $options = null)
 	{
 		$this->filterChain = new AttributeFilterChain;
 

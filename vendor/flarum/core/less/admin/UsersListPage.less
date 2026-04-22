@@ -5,6 +5,13 @@
 
   &-header {
     margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    column-gap: 8px;
+  }
+
+  &-totalUsers {
+    margin: 0;
   }
 
   &-actions {
@@ -30,24 +37,7 @@
 
     // Table refreshing overlay
     &--loadingPage {
-      &::after {
-        content: "";
-        display: block;
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: rgba(128, 128, 128, 0.2);
-      }
-
-      .LoadingIndicator-container {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        right: 0;
-      }
+      .loading-container();
     }
 
     &--loaded,
@@ -67,7 +57,7 @@
       display: flex;
       align-items: center;
 
-      &[data-column-name="editUser"] {
+      &[data-column-name="userActions"] {
         padding: 0;
         position: relative;
       }
@@ -75,31 +65,11 @@
       &--shaded {
         background: var(--body-bg-shaded);
 
-        & when (@config-dark-mode = true) {
+        [data-theme^=dark] & {
           background: var(--body-bg-light);
         }
       }
     }
-  }
-
-  &-gridPagination {
-    display: grid;
-    grid-template-columns: auto auto 1fr auto auto;
-    gap: 8px;
-    align-items: center;
-    justify-content: center;
-    margin-top: 16px;
-  }
-
-  &-pageNumber {
-    text-align: center;
-  }
-
-  &-pageNumberInput {
-    display: inline-block;
-    margin: 0 8px;
-    width: auto;
-    max-width: 80px;
   }
 }
 
@@ -111,16 +81,20 @@
     text-decoration-style: dotted;
   }
 
-  &-editModalBtn {
+  &-userActions {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &-userActionsBtn {
     width: 100%;
     height: 100%;
 
     border-radius: 0;
     padding: 0;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 
   &-email {

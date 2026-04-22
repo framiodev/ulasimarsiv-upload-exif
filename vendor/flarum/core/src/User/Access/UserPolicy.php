@@ -13,23 +13,16 @@ use Flarum\User\User;
 
 class UserPolicy extends AbstractPolicy
 {
-    /**
-     * @param User $actor
-     * @param string $ability
-     * @return bool|null
-     */
-    public function can(User $actor, $ability)
+    public function can(User $actor, string $ability): ?string
     {
         if ($actor->hasPermission('user.'.$ability)) {
             return $this->allow();
         }
+
+        return null;
     }
 
-    /**
-     * @param User $actor
-     * @param User $user
-     */
-    public function editCredentials(User $actor, User $user)
+    public function editCredentials(User $actor, User $user): ?string
     {
         if ($user->isAdmin() && ! $actor->isAdmin()) {
             return $this->deny();
@@ -38,16 +31,7 @@ class UserPolicy extends AbstractPolicy
         if ($actor->hasPermission('user.editCredentials')) {
             return $this->allow();
         }
-    }
 
-    public function uploadAvatar(User $actor, User $user)
-    {
-        if ($actor->id === $user->id) {
-            return $this->allow();
-        }
-
-        if ($actor->id !== $user->id) {
-            return $actor->can('edit', $user);
-        }
+        return null;
     }
 }

@@ -1,3 +1,6 @@
+import extractText from './utils/extractText';
+import app from './app';
+
 /**
  * Extend an object's method by running its output through a mutating callback
  * every time it is called.
@@ -24,10 +27,21 @@
  * @param callback A callback which mutates the method's output
  */
 export function extend<T extends Record<string, any>, K extends KeyOfType<T, Function>>(
-  object: T,
+  object: T | string,
   methods: K | K[],
   callback: (this: T, val: ReturnType<T[K]>, ...args: Parameters<T[K]>) => void
 ) {
+  const extension = app.currentInitializerExtension;
+
+  // A lazy loaded module, only apply the function after the module is loaded.
+  if (typeof object === 'string') {
+    let [namespace, id] = flarum.reg.namespaceAndIdFromPath(object);
+
+    return flarum.reg.onLoad(namespace, id, (module) => {
+      extend(module.prototype, methods, callback);
+    });
+  }
+
   const allMethods = Array.isArray(methods) ? methods : [methods];
 
   allMethods.forEach((method: K) => {
@@ -36,7 +50,17 @@ export function extend<T extends Record<string, any>, K extends KeyOfType<T, Fun
     object[method] = function (this: T, ...args: Parameters<T[K]>) {
       const value = original ? original.apply(this, args) : undefined;
 
-      callback.apply(this, [value, ...args]);
+      try {
+        callback.apply(this, [value, ...args]);
+      } catch (e) {
+        app.handleErrorOnce(
+          extension,
+          `${extension}::extend::${object.constructor.name}::${method.toString()}`,
+          extractText(app.translator.trans('core.lib.error.extension_runtime_failed_message', { extension })),
+          `${extension} failed to extend ${object.constructor.name}::${method.toString()}`,
+          e
+        );
+      }
 
       return value;
     } as T[K];
@@ -73,17 +97,38 @@ export function extend<T extends Record<string, any>, K extends KeyOfType<T, Fun
  * @param newMethod The method to replace it with
  */
 export function override<T extends Record<any, any>, K extends KeyOfType<T, Function>>(
-  object: T,
+  object: T | string,
   methods: K | K[],
   newMethod: (this: T, orig: T[K], ...args: Parameters<T[K]>) => void
 ) {
+  const extension = app.currentInitializerExtension;
+
+  // A lazy loaded module, only apply the function after the module is loaded.
+  if (typeof object === 'string') {
+    let [namespace, id] = flarum.reg.namespaceAndIdFromPath(object);
+
+    return flarum.reg.onLoad(namespace, id, (module) => {
+      override(module.prototype, methods, newMethod);
+    });
+  }
+
   const allMethods = Array.isArray(methods) ? methods : [methods];
 
   allMethods.forEach((method) => {
     const original: Function = object[method];
 
     object[method] = function (this: T, ...args: Parameters<T[K]>) {
-      return newMethod.apply(this, [original.bind(this), ...args]);
+      try {
+        return newMethod.apply(this, [original?.bind(this), ...args]);
+      } catch (e) {
+        app.handleErrorOnce(
+          extension,
+          `${extension}::extend::${object.constructor.name}::${method.toString()}`,
+          extractText(app.translator.trans('core.lib.error.extension_runtime_failed_message', { extension })),
+          `${extension} failed to override ${object.constructor.name}::${method.toString()}`,
+          e
+        );
+      }
     } as T[K];
 
     Object.assign(object[method], original);

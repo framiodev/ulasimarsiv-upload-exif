@@ -1,6 +1,5 @@
 import app from '../../forum/app';
-import Modal, { IInternalModalAttrs } from '../../common/components/Modal';
-import LogInModal from './LogInModal';
+import FormModal, { IFormModalAttrs } from '../../common/components/FormModal';
 import Button from '../../common/components/Button';
 import LogInButtons from './LogInButtons';
 import extractText from '../../common/utils/extractText';
@@ -8,7 +7,7 @@ import ItemList from '../../common/utils/ItemList';
 import Stream from '../../common/utils/Stream';
 import type Mithril from 'mithril';
 
-export interface ISignupModalAttrs extends IInternalModalAttrs {
+export interface ISignupModalAttrs extends IFormModalAttrs {
   username?: string;
   email?: string;
   password?: string;
@@ -21,7 +20,7 @@ export type SignupBody = {
   email: string;
 } & ({ token: string } | { password: string });
 
-export default class SignUpModal<CustomAttrs extends ISignupModalAttrs = ISignupModalAttrs> extends Modal<CustomAttrs> {
+export default class SignUpModal<CustomAttrs extends ISignupModalAttrs = ISignupModalAttrs> extends FormModal<CustomAttrs> {
   /**
    * The value of the username input.
    */
@@ -75,6 +74,7 @@ export default class SignUpModal<CustomAttrs extends ISignupModalAttrs = ISignup
     items.add(
       'username',
       <div className="Form-group">
+        <label className="label">{usernameLabel}</label>
         <input
           className="FormControl"
           name="username"
@@ -91,6 +91,7 @@ export default class SignUpModal<CustomAttrs extends ISignupModalAttrs = ISignup
     items.add(
       'email',
       <div className="Form-group">
+        <label className="label">{emailLabel}</label>
         <input
           className="FormControl"
           name="email"
@@ -108,6 +109,7 @@ export default class SignUpModal<CustomAttrs extends ISignupModalAttrs = ISignup
       items.add(
         'password',
         <div className="Form-group">
+          <label className="label">{passwordLabel}</label>
           <input
             className="FormControl"
             name="password"
@@ -138,7 +140,11 @@ export default class SignUpModal<CustomAttrs extends ISignupModalAttrs = ISignup
 
   footer() {
     return [
-      <p className="SignUpModal-logIn">{app.translator.trans('core.forum.sign_up.log_in_text', { a: <a onclick={this.logIn.bind(this)} /> })}</p>,
+      <p className="SignUpModal-logIn">
+        {app.translator.trans('core.forum.sign_up.log_in_text', {
+          a: <Button className="Button Button--text Button--link" onclick={this.logIn.bind(this)} />,
+        })}
+      </p>,
     ];
   }
 
@@ -151,7 +157,7 @@ export default class SignUpModal<CustomAttrs extends ISignupModalAttrs = ISignup
       identification: this.email() || this.username(),
     };
 
-    app.modal.show(LogInModal, attrs);
+    app.modal.show(() => import('./LogInModal'), attrs);
   }
 
   onready() {

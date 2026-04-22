@@ -6,6 +6,7 @@ import { disableBodyScroll, clearAllBodyScrollLocks } from 'body-scroll-lock';
 
 import type ModalManagerState from '../states/ModalManagerState';
 import type Mithril from 'mithril';
+import LoadingIndicator from './LoadingIndicator';
 
 interface IModalManagerAttrs {
   state: ModalManagerState;
@@ -22,6 +23,12 @@ export default class ModalManager extends Component<IModalManagerAttrs> {
 
   // Keep track of the last set focus trap
   protected lastSetFocusTrap: number | undefined;
+
+  // Current close watcher instance
+  protected closeWatcher: CloseWatcher | undefined;
+
+  // Keep track of the last set close watcher
+  protected lastCloseWatcherKey: number | undefined;
 
   // Keep track if there's an modal closing
   protected modalClosing: boolean = false;
@@ -42,7 +49,7 @@ export default class ModalManager extends Component<IModalManagerAttrs> {
               data-modal-number={i}
               role="dialog"
               aria-modal="true"
-              style={{ '--modal-number': i }}
+              style={!window.testing && { '--modal-number': i }}
               aria-hidden={this.attrs.state.modal !== modal && 'true'}
             >
               {!!Tag && [
@@ -60,13 +67,15 @@ export default class ModalManager extends Component<IModalManagerAttrs> {
           );
         })}
 
-        {this.attrs.state.backdropShown && (
+        {(this.attrs.state.backdropShown || this.attrs.state.loadingModal) && (
           <div
             className="Modal-backdrop backdrop"
             ontransitionend={this.onBackdropTransitionEnd.bind(this)}
-            data-showing={!!this.attrs.state.modalList.length}
-            style={{ '--modal-count': this.attrs.state.modalList.length }}
-          />
+            data-showing={!!this.attrs.state.modalList.length || this.attrs.state.loadingModal}
+            style={!window.testing && { '--modal-count': this.attrs.state.modalList.length + Number(this.attrs.state.loadingModal) }}
+          >
+            {this.attrs.state.loadingModal && <LoadingIndicator />}
+          </div>
         )}
       </>
     );
@@ -95,8 +104,13 @@ export default class ModalManager extends Component<IModalManagerAttrs> {
         // See: http://web-accessibility.carnegiemuseums.org/code/dialogs/
 
         if (!this.attrs.state.isModalOpen()) {
-          document.getElementById('app')?.setAttribute('aria-hidden', 'false');
+          document.getElementById('app')?.removeAttribute('aria-hidden');
           this.focusTrap!.deactivate?.();
+
+          // Destroy a close watcher instance
+          this.closeWatcher?.destroy();
+          this.closeWatcher = undefined;
+
           clearAllBodyScrollLocks();
 
           return;
@@ -119,11 +133,30 @@ export default class ModalManager extends Component<IModalManagerAttrs> {
           this.focusTrap = createFocusTrap(this.activeDialogElement as HTMLElement, { allowOutsideClick: true });
           this.focusTrap!.activate?.();
 
-          disableBodyScroll(this.activeDialogManagerElement!, { reserveScrollBarGap: true });
+          if (this.activeDialogManagerElement) {
+            disableBodyScroll(this.activeDialogManagerElement, { reserveScrollBarGap: true });
+          }
         }
 
         // Update key of current opened modal
         this.lastSetFocusTrap = dialogKey;
+
+        // Initialize CloseWatcher for the new dialog
+        if ('CloseWatcher' in window && this.lastCloseWatcherKey !== dialogKey) {
+          // Destroy previous watcher when stacking modals
+          this.closeWatcher?.destroy();
+          this.closeWatcher = undefined;
+
+          if (this.attrs.state.modal!.componentClass.dismissibleOptions.viaEscKey) {
+            this.closeWatcher = new CloseWatcher();
+            this.closeWatcher.onclose = () => {
+              this.animateHide();
+            };
+          }
+
+          // Update key of the current close watcher
+          this.lastCloseWatcherKey = dialogKey;
+        }
       } catch {
         // We can expect errors to occur here due to the nature of mithril rendering
       }
@@ -133,21 +166,21 @@ export default class ModalManager extends Component<IModalManagerAttrs> {
   /**
    * Get current active dialog
    */
-  private get activeDialogElement(): HTMLElement {
-    return document.body.querySelector(`.ModalManager[data-modal-key="${this.attrs.state.modal?.key}"] .Modal`) as HTMLElement;
+  private get activeDialogElement(): HTMLElement | null {
+    return document.body.querySelector(`.ModalManager[data-modal-key="${this.attrs.state.modal?.key}"] .Modal`) as HTMLElement | null;
   }
 
   /**
    * Get current active dialog
    */
-  private get activeDialogManagerElement(): HTMLElement {
-    return document.body.querySelector(`.ModalManager[data-modal-key="${this.attrs.state.modal?.key}"]`) as HTMLElement;
+  private get activeDialogManagerElement(): HTMLElement | null {
+    return document.body.querySelector(`.ModalManager[data-modal-key="${this.attrs.state.modal?.key}"]`) as HTMLElement | null;
   }
 
   animateShow(readyCallback: () => void = () => {}): void {
     if (!this.attrs.state.modal) return;
 
-    this.activeDialogElement.addEventListener(
+    this.activeDialogElement?.addEventListener(
       'transitionend',
       () => {
         readyCallback();
@@ -156,7 +189,7 @@ export default class ModalManager extends Component<IModalManagerAttrs> {
     );
 
     requestAnimationFrame(() => {
-      this.activeDialogElement.classList.add('in');
+      this.activeDialogElement?.classList.add('in');
     });
   }
 
@@ -173,14 +206,15 @@ export default class ModalManager extends Component<IModalManagerAttrs> {
       closedCallback();
     };
 
-    this.activeDialogElement.addEventListener('transitionend', afterModalClosedCallback, { once: true });
+    this.activeDialogElement?.addEventListener('transitionend', afterModalClosedCallback, { once: true });
 
-    this.activeDialogElement.classList.remove('in');
-    this.activeDialogElement.classList.add('out');
+    this.activeDialogElement?.classList.remove('in');
+    this.activeDialogElement?.classList.add('out');
   }
 
   protected handleEscPress(e: KeyboardEvent): void {
-    if (!this.attrs.state.modal) return;
+    // Skip manual Escape handling if CloseWatcher is active
+    if (!this.attrs.state.modal || this.closeWatcher?.onclose) return;
 
     const dismissibleState = this.attrs.state.modal.componentClass.dismissibleOptions;
 

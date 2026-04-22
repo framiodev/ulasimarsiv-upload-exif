@@ -2,7 +2,7 @@
 
 /**
 * @package   s9e\TextFormatter
-* @copyright Copyright (c) 2010-2023 The s9e authors
+* @copyright Copyright (c) The s9e authors
 * @license   http://www.opensource.org/licenses/mit-license.php The MIT License
 */
 namespace s9e\TextFormatter\Utils\Http\Clients;
@@ -53,10 +53,11 @@ class Native extends Client
 		$contextOptions = [
 			'ssl'  => ['verify_peer' => $this->sslVerifyPeer],
 			'http' => [
-				'method'  => $method,
-				'timeout' => $this->timeout,
-				'header'  => $this->generateHeaders($options, $body),
-				'content' => $body
+				'content'       => $body,
+				'header'        => $this->generateHeaders($options, $body),
+				'ignore_errors' => true,
+				'method'        => $method,
+				'timeout'       => $this->timeout
 			]
 		];
 

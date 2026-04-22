@@ -4,11 +4,13 @@ import classList from '../../common/utils/classList';
 import PostUser from './PostUser';
 import PostMeta from './PostMeta';
 import PostEdited from './PostEdited';
-import EditPostComposer from './EditPostComposer';
 import ItemList from '../../common/utils/ItemList';
-import listItems from '../../common/helpers/listItems';
 import Button from '../../common/components/Button';
-import ComposerPostPreview from './ComposerPostPreview';
+import Link from '../../common/components/Link';
+import Avatar from '../../common/components/Avatar';
+import escapeRegExp from '../../common/utils/escapeRegExp';
+import highlight from '../../common/helpers/highlight';
+import Comment from './Comment';
 
 /**
  * The `CommentPost` component displays a standard `comment`-typed post. This
@@ -46,36 +48,31 @@ export default class CommentPost extends Post {
     );
   }
 
+  avatar() {
+    const user = this.attrs.post.user();
+    const view = <Avatar user={user} className="Post-avatar" />;
+
+    if (user) {
+      return <Link href={app.route.user(user)}>{view}</Link>;
+    }
+
+    return view;
+  }
+
   content() {
-    return super.content().concat(this.contentItems().toArray());
-  }
-
-  contentItems() {
-    const items = new ItemList();
-
-    items.add(
-      'header',
-      <header className="Post-header">
-        <ul>{listItems(this.headerItems().toArray())}</ul>
-      </header>,
-      100
-    );
-
-    items.add('body', <div className="Post-body">{this.bodyItems().toArray()}</div>, 90);
-
-    return items;
-  }
-
-  bodyItems() {
-    const items = new ItemList();
-
-    items.add(
-      'content',
-      this.isEditing() ? <ComposerPostPreview className="Post-preview" composer={app.composer} /> : m.trust(this.attrs.post.contentHtml()),
-      100
-    );
-
-    return items;
+    return super
+      .content()
+      .concat([
+        <Comment
+          headerItems={this.headerItems()}
+          cardVisible={this.cardVisible}
+          isEditing={this.isEditing()}
+          isHidden={this.attrs.post.isHidden()}
+          contentHtml={this.attrs.post.contentHtml()}
+          user={this.attrs.post.user()}
+          search={this.params?.q}
+        />,
+      ]);
   }
 
   refreshContent() {
@@ -99,6 +96,7 @@ export default class CommentPost extends Post {
   oncreate(vnode) {
     super.oncreate(vnode);
 
+    this.listenForCard();
     this.refreshContent();
   }
 
@@ -109,7 +107,7 @@ export default class CommentPost extends Post {
   }
 
   isEditing() {
-    return app.composer.bodyMatches(EditPostComposer, { post: this.attrs.post });
+    return app.composer.bodyMatches('flarum/forum/components/EditPostComposer', { post: this.attrs.post });
   }
 
   elementAttrs() {
@@ -145,22 +143,7 @@ export default class CommentPost extends Post {
     const items = new ItemList();
     const post = this.attrs.post;
 
-    items.add(
-      'user',
-      <PostUser
-        post={post}
-        cardVisible={this.cardVisible}
-        oncardshow={() => {
-          this.cardVisible = true;
-          m.redraw();
-        }}
-        oncardhide={() => {
-          this.cardVisible = false;
-          m.redraw();
-        }}
-      />,
-      100
-    );
+    items.add('user', <PostUser post={post} />, 100);
     items.add('meta', <PostMeta post={post} />);
 
     if (post.isEdited() && !post.isHidden()) {
@@ -177,5 +160,41 @@ export default class CommentPost extends Post {
     }
 
     return items;
+  }
+
+  listenForCard() {
+    let timeout;
+
+    this.$()
+      .on('mouseover', '.PostUser-name a, .UserCard, .Post-avatar', () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(this.showCard.bind(this), 500);
+      })
+      .on('mouseout', '.PostUser-name a, .UserCard, .Post-avatar', () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(this.hideCard.bind(this), 250);
+      });
+  }
+
+  /**
+   * Show the user card.
+   */
+  showCard() {
+    this.cardVisible = true;
+    m.redraw();
+
+    setTimeout(() => this.$('.UserCard').addClass('in'));
+  }
+
+  /**
+   * Hide the user card.
+   */
+  hideCard() {
+    this.$('.UserCard')
+      .removeClass('in')
+      .one('transitionend webkitTransitionEnd oTransitionEnd', () => {
+        this.cardVisible = false;
+        m.redraw();
+      });
   }
 }

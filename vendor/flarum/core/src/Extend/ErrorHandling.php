@@ -15,10 +15,10 @@ use Illuminate\Contracts\Container\Container;
 
 class ErrorHandling implements ExtenderInterface
 {
-    private $statuses = [];
-    private $types = [];
-    private $handlers = [];
-    private $reporters = [];
+    private array $statuses = [];
+    private array $types = [];
+    private array $handlers = [];
+    private array $reporters = [];
 
     /**
      * Define the corresponding HTTP status code for a well-known error type.
@@ -32,7 +32,6 @@ class ErrorHandling implements ExtenderInterface
      *
      * @param string $errorType: Type of the error.
      * @param int $httpStatus: The status code for this error.
-     * @return self
      */
     public function status(string $errorType, int $httpStatus): self
     {
@@ -52,7 +51,6 @@ class ErrorHandling implements ExtenderInterface
      *
      * @param string $exceptionClass: The ::class attribute of the exception class.
      * @param string $errorType: Type of the error.
-     * @return self
      */
     public function type(string $exceptionClass, string $errorType): self
     {
@@ -67,7 +65,7 @@ class ErrorHandling implements ExtenderInterface
      * When Flarum's default error handling is not enough for you, and the other
      * methods of this extender don't help, this is the place where you can go
      * wild! Using this method, you can define a handler class (second
-     * parameter) that will be responsible for exceptions of a certain type
+     * parameter) that will be responsible for exceptions to a certain type
      * (first parameter).
      *
      * The handler class must implement a handle() method (surprise!), which
@@ -77,7 +75,6 @@ class ErrorHandling implements ExtenderInterface
      *
      * @param string $exceptionClass: The ::class attribute of the exception class.
      * @param string $handlerClass: The ::class attribute of the handler class.
-     * @return self
      */
     public function handler(string $exceptionClass, string $handlerClass): self
     {
@@ -96,10 +93,9 @@ class ErrorHandling implements ExtenderInterface
      * administrators are notified about the error.
      *
      * When passing in a reporter class, make sure that it implements the
-     * {@see \Flarum\Foundation\ErrorHandling\Reporter} interface.
+     * {@see Reporter} interface.
      *
-     * @param string $reporterClass: The ::class attribute of the reporter class.
-     * @return self
+     * @param class-string<Reporter> $reporterClass: The ::class attribute of the reporter class.
      */
     public function reporter(string $reporterClass): self
     {
@@ -108,7 +104,7 @@ class ErrorHandling implements ExtenderInterface
         return $this;
     }
 
-    public function extend(Container $container, Extension $extension = null)
+    public function extend(Container $container, ?Extension $extension = null): void
     {
         if (count($this->statuses)) {
             $container->extend('flarum.error.statuses', function ($statuses) {

@@ -8,10 +8,6 @@
     }
   }
 
-  .Form-group {
-    margin-bottom: 20px;
-  }
-
   ul {
     list-style: none;
     margin: 0;
@@ -19,16 +15,15 @@
   }
 }
 
+.BasicsPage-abandonedSyncMessage {
+  margin-left: 0.75rem;
+}
+
 .BasicsPage-welcomeBanner-input {
-  input {
-    margin-bottom: 1px;
-    border-bottom-right-radius: 0;
-    border-bottom-left-radius: 0;
+  .StackedFormControl > :first-child {
     font-weight: bold;
   }
   textarea {
-    border-top-right-radius: 0;
-    border-top-left-radius: 0;
-    margin-bottom: 10px;
+    min-width: 100%;
   }
 }

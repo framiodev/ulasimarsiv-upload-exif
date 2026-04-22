@@ -9,19 +9,28 @@
 
 namespace Flarum\Queue\Console;
 
-use Flarum\Foundation\Config;
+use Carbon\Carbon;
+use Flarum\Settings\SettingsRepositoryInterface;
+use Illuminate\Contracts\Cache\Repository as Cache;
+use Illuminate\Queue\Worker;
 
 class WorkCommand extends \Illuminate\Queue\Console\WorkCommand
 {
-    protected function downForMaintenance()
+    public function __construct(Worker $worker, Cache $cache, protected SettingsRepositoryInterface $settings)
     {
-        if ($this->option('force')) {
-            return false;
+        parent::__construct($worker, $cache);
+    }
+
+    public function handle()
+    {
+        $this->settings->set('database_queue.working', Carbon::now()->toIso8601String());
+
+        try {
+            return parent::handle();
+        } catch (\Exception $e) {
+            $this->settings->delete('database_queue.working');
+
+            throw $e;
         }
-
-        /** @var Config $config */
-        $config = $this->laravel->make(Config::class);
-
-        return $config->inMaintenanceMode();
     }
 }
