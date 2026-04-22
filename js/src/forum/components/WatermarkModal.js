@@ -1,7 +1,7 @@
 import Modal from 'flarum/common/components/Modal';
 import Button from 'flarum/common/components/Button';
 import Stream from 'flarum/common/utils/Stream';
-import avatar from 'flarum/common/helpers/avatar';
+import Avatar from 'flarum/common/components/Avatar';
 import app from 'flarum/forum/app';
 
 // --- CSS STİLLERİ ---
@@ -449,7 +449,7 @@ export default class WatermarkModal extends Modal {
                             <ul className="Dropdown-menu" style={{display: 'block', width: '100%', position: 'absolute', top: '100%', left: 0, zIndex: 999, maxHeight: '200px', overflowY: 'auto', marginTop: '5px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)'}}>
                                 {this.userSearchResults.map(user => (
                                     <li style={{cursor: 'pointer', padding:'5px 10px'}} onclick={() => this.selectUser(user)}>
-                                        {avatar(user, {className: 'Avatar--small', style: 'margin-right: 10px; vertical-align: middle;'})}
+                                        <Avatar user={user} className="Avatar--small" style={{marginRight: '10px', verticalAlign: 'middle'}} />
                                         <span style={{fontWeight: 'bold'}}>{user.username()}</span>
                                     </li>
                                 ))}

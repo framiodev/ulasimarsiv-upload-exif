@@ -1,6 +1,6 @@
 import UserPage from 'flarum/forum/components/UserPage';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
-import icon from 'flarum/common/helpers/icon';
+import Icon from 'flarum/common/components/Icon';
 import app from 'flarum/forum/app';
 
 export default class UserUploadsPage extends UserPage {
@@ -98,7 +98,7 @@ export default class UserUploadsPage extends UserPage {
         {/* --- YENİ BAŞLIK ALANI --- */}
         <div className="UserUploads-header" style={{ marginBottom: '20px', paddingBottom: '10px', borderBottom: '1px solid #e8e8e8' }}>
             <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#333' }}>
-                {icon('fas fa-photo-video', {style: 'margin-right:8px; color: #666'})}
+                <Icon name="fas fa-photo-video" style={{marginRight:'8px', color: '#666'}} />
                 Kullanıcı Medyası
             </h3>
         </div>
@@ -112,7 +112,7 @@ export default class UserUploadsPage extends UserPage {
             </div>
           ) : this.images.length === 0 ? (
             <div className="Placeholder" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: '#777' }}>
-              <p>{icon('fas fa-camera-retro', {style: 'font-size:40px; margin-bottom:10px; display:block;'})}</p>
+              <p><Icon name="fas fa-camera-retro" style={{fontSize:'40px', marginBottom:'10px', display:'block'}} /></p>
               <p>Henüz hiç fotoğraf yüklenmemiş.</p>
             </div>
           ) : (
@@ -133,7 +133,7 @@ export default class UserUploadsPage extends UserPage {
                             loading="lazy"
                         />
                         <div className="Spotter-Hover-Icon">
-                            {icon('fas fa-expand-arrows-alt')}
+                            <Icon name="fas fa-expand-arrows-alt" />
                         </div>
                   </div>
                 );
@@ -145,11 +145,11 @@ export default class UserUploadsPage extends UserPage {
         {this.lightboxOpen && this.images[this.currentIndex] ? (
             <div className="Spotter-Lightbox-Overlay" onclick={() => this.closeLightbox()}>
                 
-                <div className="Spotter-Lightbox-Close">{icon('fas fa-times')}</div>
+                <div className="Spotter-Lightbox-Close"><Icon name="fas fa-times" /></div>
 
                 <div className="Spotter-Lightbox-Container" onclick={(e) => e.stopPropagation()}>
                     <div className="Spotter-Nav Prev" onclick={(e) => this.prevImage(e)}>
-                        {icon('fas fa-chevron-left')}
+                        <Icon name="fas fa-chevron-left" />
                     </div>
 
                     {(() => {
@@ -174,7 +174,7 @@ export default class UserUploadsPage extends UserPage {
                     })()}
 
                     <div className="Spotter-Nav Next" onclick={(e) => this.nextImage(e)}>
-                        {icon('fas fa-chevron-right')}
+                        <Icon name="fas fa-chevron-right" />
                     </div>
                 </div>
             </div>

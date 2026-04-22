@@ -1,5 +1,5 @@
 import Component from 'flarum/common/Component';
-import icon from 'flarum/common/helpers/icon';
+import Icon from 'flarum/common/components/Icon';
 import app from 'flarum/forum/app';
 import Tooltip from 'flarum/common/components/Tooltip';
 import WatermarkModal from './WatermarkModal';
@@ -17,7 +17,7 @@ export default class UploadButton extends Component {
     return (
       <Tooltip text={this.loading ? '' : 'Fotoğraf Yükle'}> 
         <button className={buttonClasses} type="button" onclick={() => !this.loading && this.element.querySelector('input').click()}>
-            {this.loading ? icon('fas fa-spinner fa-spin') : icon('fas fa-camera')}
+            {this.loading ? <Icon name="fas fa-spinner fa-spin" /> : <Icon name="fas fa-camera" />}
             <span className="Button-label">{this.loading ? ' Yükleniyor...' : 'Fotoğraf Yükle'}</span>
             <input type="file" multiple accept="image/*" style="display:none" onchange={this.process.bind(this)} />
         </button>
