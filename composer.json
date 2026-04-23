@@ -1,6 +1,6 @@
 {
     "name": "ulasimarsiv/upload-exif",
-    "description": "Ulaşım Arşiv Upload & EXIF",
+    "version": "1.0.14",
     "type": "flarum-extension",
     "keywords": [
         "flarum",

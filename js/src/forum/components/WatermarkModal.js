@@ -3,6 +3,7 @@ import Button from 'flarum/common/components/Button';
 import Stream from 'flarum/common/utils/Stream';
 import Avatar from 'flarum/common/components/Avatar';
 import app from 'flarum/forum/app';
+import m from 'mithril';
 
 // --- CSS STİLLERİ ---
 const CUSTOM_CSS = `

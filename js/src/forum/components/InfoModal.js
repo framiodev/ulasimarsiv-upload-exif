@@ -2,6 +2,7 @@ import Modal from 'flarum/common/components/Modal';
 import Button from 'flarum/common/components/Button';
 import Stream from 'flarum/common/utils/Stream';
 import app from 'flarum/forum/app';
+import m from 'mithril';
 
 export default class InfoModal extends Modal {
   oninit(vnode) {
