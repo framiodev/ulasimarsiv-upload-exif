@@ -38,7 +38,13 @@ export default class AttributeModal extends Modal {
   }
 
   updateModels(brandName) {
-      this.availableModels = this.taxonomy.filter(item => item.brand === brandName);
+      if (!brandName) {
+          this.availableModels = [];
+          return;
+      }
+      const targetBrand = String(brandName).trim();
+      this.availableModels = this.taxonomy.filter(item => String(item.brand).trim() === targetBrand);
+      m.redraw();
   }
 
   className() {
@@ -53,7 +59,7 @@ export default class AttributeModal extends Modal {
     const labelStyle = "display: flex; align-items: flex-end; min-height: 36px; margin-bottom: 6px; font-weight: bold; font-size: 13px; line-height: 1.3;";
 
     // Benzersiz markaları alalım
-    const brands = [...new Set(this.taxonomy.map(item => item.brand))].sort();
+    const brands = [...new Set(this.taxonomy.map(item => String(item.brand).trim()))].sort();
 
     return (
       <div className="Modal-body">
