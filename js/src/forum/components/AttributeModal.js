@@ -16,9 +16,29 @@ export default class AttributeModal extends Modal {
     this.location = Stream(initial.location || '');
     this.year = Stream(initial.year || '');
 
+    this.taxonomy = [];
+    this.availableModels = [];
+    this.loadTaxonomy();
+
     this.onsubmitCallback = this.attrs.onsubmit;
     this.onskipCallback = this.attrs.onskip;
     this.onInfoCallback = this.attrs.onInfo;
+  }
+
+  loadTaxonomy() {
+      app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/ulasimarsiv-taxonomy' }).then(result => {
+          this.taxonomy = result.data || [];
+          
+          // Eğer başlangıçta marka seçiliyse modelleri doldur
+          if (this.brand()) {
+              this.updateModels(this.brand());
+          }
+          m.redraw();
+      });
+  }
+
+  updateModels(brandName) {
+      this.availableModels = this.taxonomy.filter(item => item.brand === brandName);
   }
 
   className() {
@@ -31,6 +51,9 @@ export default class AttributeModal extends Modal {
 
   content() {
     const labelStyle = "display: flex; align-items: flex-end; min-height: 36px; margin-bottom: 6px; font-weight: bold; font-size: 13px; line-height: 1.3;";
+
+    // Benzersiz markaları alalım
+    const brands = [...new Set(this.taxonomy.map(item => item.brand))].sort();
 
     return (
       <div className="Modal-body">
@@ -55,12 +78,27 @@ export default class AttributeModal extends Modal {
             {/* 2. Grup */}
             <div style="display: flex; gap: 20px; margin-bottom: 15px;">
                 <div style="flex: 1;">
-                    <label style={labelStyle}>Marka (Örn: Mercedes-Benz)</label>
-                    <input className="FormControl" bidi={this.brand} />
+                    <label style={labelStyle}>Marka Seçiniz</label>
+                    <select className="FormControl" value={this.brand()} onchange={(e) => {
+                        this.brand(e.target.value);
+                        this.model(''); // Marka değişince modeli sıfırla
+                        this.updateModels(e.target.value);
+                    }}>
+                        <option value="">-- Marka Seç --</option>
+                        {brands.map(b => <option value={b}>{b}</option>)}
+                        <option value="Diğer">Diğer</option>
+                    </select>
                 </div>
                 <div style="flex: 1;">
-                    <label style={labelStyle}>Model (Örn: Travego 15 SHD)</label>
-                    <input className="FormControl" bidi={this.model} />
+                    <label style={labelStyle}>Model Seçiniz</label>
+                    {this.brand() === 'Diğer' ? (
+                        <input className="FormControl" bidi={this.model} placeholder="Modeli el ile yazın..." />
+                    ) : (
+                        <select className="FormControl" value={this.model()} onchange={e => this.model(e.target.value)} disabled={!this.brand()}>
+                            <option value="">-- Model Seç --</option>
+                            {this.availableModels.map(m => <option value={m.model}>{m.model}</option>)}
+                        </select>
+                    )}
                 </div>
             </div>
 

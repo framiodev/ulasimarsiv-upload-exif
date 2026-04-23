@@ -12,6 +12,8 @@ use UlasimArsiv\UploadExif\Api\Controller\GetWatermarksController;
 use UlasimArsiv\UploadExif\Api\Controller\ListAdminWatermarksController;
 use UlasimArsiv\UploadExif\Api\Controller\UploadWatermarkController;
 use UlasimArsiv\UploadExif\Api\Controller\DeleteWatermarkController as AdminDeleteWatermarkController;
+use UlasimArsiv\UploadExif\Api\Controller\ListTaxonomyController;
+use UlasimArsiv\UploadExif\Api\Controller\SaveTaxonomyController;
 
 return [
     (new Extend\Frontend('forum'))
@@ -38,7 +40,11 @@ return [
         // --- ADMIN WATERMARK YÖNETİMİ ---
         ->get('/ulasimarsiv-admin-watermarks', 'ulasimarsiv.admin.watermarks.list', ListAdminWatermarksController::class)
         ->post('/ulasimarsiv-admin-watermarks', 'ulasimarsiv.admin.watermarks.upload', UploadWatermarkController::class)
-        ->post('/ulasimarsiv-admin-watermarks-delete', 'ulasimarsiv.admin.watermarks.delete', AdminDeleteWatermarkController::class),
+        ->post('/ulasimarsiv-admin-watermarks-delete', 'ulasimarsiv.admin.watermarks.delete', AdminDeleteWatermarkController::class)
+        
+        // --- MARKA & MODEL YÖNETİMİ (TAXONOMY) ---
+        ->get('/ulasimarsiv-taxonomy', 'ulasimarsiv.taxonomy.list', ListTaxonomyController::class)
+        ->post('/ulasimarsiv-taxonomy', 'ulasimarsiv.taxonomy.save', SaveTaxonomyController::class),
 
     // --- YENİ EKLENEN KISIM: AYAR PAYLAŞIMI ---
     // Bu kısım, admin panelindeki EXIF ayarının ziyaretçilere de iletilmesini sağlar.

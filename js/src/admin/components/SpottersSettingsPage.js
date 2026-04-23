@@ -31,6 +31,13 @@ export default class SpottersSettingsPage extends ExtensionPage {
     this.loadImages();
     this.loadOriginals(); // Orijinalleri de yükle
     this.loadAdminWatermarks();
+    this.loadTaxonomy();
+
+    this.taxonomy = [];
+    this.newBrand = '';
+    this.newModel = '';
+    this.newVehicleType = 'bus';
+    this.isSavingTaxonomy = false;
   }
 
   content() {
@@ -43,6 +50,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
             {this.buildTab('general', 'Genel Yapılandırma', 'fas fa-cogs')}
             {this.buildTab('visibility', 'Görünürlük', 'fas fa-eye')}
             {this.buildTab('watermark', 'Filigran Yönetimi', 'fas fa-stamp')}
+            {this.buildTab('taxonomy', 'Marka & Model', 'fas fa-bus')}
             {this.buildTab('media', 'Medya Yönetimi', 'fas fa-images')}
           </div>
 
@@ -50,6 +58,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
             {this.activeTab === 'general' && this.renderGeneralTab()}
             {this.activeTab === 'visibility' && this.renderVisibilityTab()}
             {this.activeTab === 'watermark' && this.renderWatermarkTab()}
+            {this.activeTab === 'taxonomy' && this.renderTaxonomyTab()}
             {this.activeTab === 'media' && this.renderMediaTab()}
           </div>
           
@@ -217,6 +226,78 @@ export default class SpottersSettingsPage extends ExtensionPage {
       );
   }
 
+  renderTaxonomyTab() {
+      // Markalara göre gruplayalım
+      const grouped = {};
+      this.taxonomy.forEach(item => {
+          if (!grouped[item.brand]) grouped[item.brand] = [];
+          grouped[item.brand].push(item);
+      });
+
+      return (
+          <div className="TaxonomyManager-section">
+              <h3 className="Settings-title" style={{color: '#800000'}}>
+                  <i className="fas fa-bus" style={{marginRight:'10px'}}></i>
+                  Marka & Model Yönetimi
+              </h3>
+              <p className="helpText">Buradan eklediğiniz marka ve modeller, kullanıcıların fotoğraf yükleme modalında seçim yapabilmesini sağlar.</p>
+
+              <div style={{ display: 'flex', gap: '15px', alignItems: 'center', background: '#f9f9f9', padding: '15px', borderRadius: '6px', border: '1px solid #ddd', marginBottom: '20px', flexWrap: 'wrap' }}>
+                  <input 
+                      className="FormControl" 
+                      type="text" 
+                      placeholder="Marka (Örn: Mercedes-Benz)" 
+                      value={this.newBrand}
+                      oninput={e => this.newBrand = e.target.value}
+                      style={{width: '200px'}}
+                  />
+                  <input 
+                      className="FormControl" 
+                      type="text" 
+                      placeholder="Model (Örn: Travego)" 
+                      value={this.newModel}
+                      oninput={e => this.newModel = e.target.value}
+                      style={{width: '200px'}}
+                  />
+                  <select className="FormControl" value={this.newVehicleType} onchange={e => this.newVehicleType = e.target.value} style={{width: '120px'}}>
+                      <option value="bus">Otobüs</option>
+                      <option value="truck">Kamyon</option>
+                  </select>
+                  <Button 
+                      className="Button Button--primary" 
+                      icon="fas fa-plus" 
+                      loading={this.isSavingTaxonomy}
+                      onclick={() => this.saveTaxonomy()}
+                      disabled={!this.newBrand || !this.newModel}
+                  >
+                      Ekle
+                  </Button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                  {Object.keys(grouped).sort().map(brand => (
+                      <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden' }}>
+                          <div style={{ background: '#f5f6fa', padding: '10px', borderBottom: '1px solid #eee', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                              <span>{brand}</span>
+                              <span style={{fontSize: '11px', color: '#999'}}>{grouped[brand].length} Model</span>
+                          </div>
+                          <div style={{ padding: '10px' }}>
+                              {grouped[brand].map(item => (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px', padding: '5px', borderRadius: '4px', background: '#fcfcfc', border: '1px solid #f0f0f0' }}>
+                                      <span style={{fontSize: '13px'}}>{item.model}</span>
+                                      <Button className="Button Button--link Button--icon" icon="fas fa-trash-alt" onclick={() => this.deleteTaxonomy(item.id)} style={{color: '#e74c3c'}}></Button>
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                  ))}
+              </div>
+              
+              {this.taxonomy.length === 0 && <div style={{padding: '40px', textAlign: 'center', color: '#999'}}>Henüz kayıtlı marka/model bulunmuyor.</div>}
+          </div>
+      );
+  }
+
   renderMediaTab() {
       return (
           <div>
@@ -357,6 +438,44 @@ export default class SpottersSettingsPage extends ExtensionPage {
       app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/ulasimarsiv-admin-watermarks' }).then(result => {
           this.adminWatermarks = result.data || [];
           m.redraw();
+      });
+  }
+
+  loadTaxonomy() {
+      app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/ulasimarsiv-taxonomy' }).then(result => {
+          this.taxonomy = result.data || [];
+          m.redraw();
+      });
+  }
+
+  saveTaxonomy() {
+      if (!this.newBrand || !this.newModel) return;
+      this.isSavingTaxonomy = true;
+      app.request({
+          method: 'POST',
+          url: app.forum.attribute('apiUrl') + '/ulasimarsiv-taxonomy',
+          body: {
+              brand: this.newBrand,
+              model: this.newModel,
+              type: this.newVehicleType
+          }
+      }).then(res => {
+          this.newModel = ''; // Sadece modeli temizle ki aynı markaya seri ekleme kolay olsun
+          this.isSavingTaxonomy = false;
+          this.loadTaxonomy();
+          app.alerts.show({ type: 'success' }, 'Kaydedildi.');
+      });
+  }
+
+  deleteTaxonomy(id) {
+      if (!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return;
+      app.request({
+          method: 'POST',
+          url: app.forum.attribute('apiUrl') + '/ulasimarsiv-taxonomy',
+          body: { action: 'delete', id }
+      }).then(() => {
+          this.loadTaxonomy();
+          app.alerts.show({ type: 'success' }, 'Silindi.');
       });
   }
 
