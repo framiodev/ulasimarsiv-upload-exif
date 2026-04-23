@@ -2,7 +2,6 @@ import Modal from 'flarum/common/components/Modal';
 import Button from 'flarum/common/components/Button';
 import Stream from 'flarum/common/utils/Stream';
 import app from 'flarum/forum/app';
-import m from 'mithril';
 
 export default class InfoModal extends Modal {
   oninit(vnode) {
@@ -47,14 +46,15 @@ export default class InfoModal extends Modal {
             <textarea 
                 className="FormControl" 
                 rows="10" 
-                bidi={this.infoText}
+                value={this.infoText()}
+                oninput={e => this.infoText(e.target.value)}
                 id="infoTextArea"
                 placeholder="Detaylı bilgileri buraya girebilirsiniz..."
                 style={{borderRadius: '0 0 4px 4px', fontFamily: 'monospace'}}
             />
         </div>
 
-        <div className="Form-group" style="display: flex; justify-content: space-between; gap: 10px;">
+        <div className="Form-group" style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
              <Button className="Button Button--text" icon="fas fa-arrow-left" onclick={this.back.bind(this)}>
                 Künye Ekranına Dön
              </Button>

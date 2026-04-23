@@ -2,7 +2,6 @@ import Modal from 'flarum/common/components/Modal';
 import Button from 'flarum/common/components/Button';
 import Stream from 'flarum/common/utils/Stream';
 import app from 'flarum/forum/app';
-import m from 'mithril';
 
 export default class AttributeModal extends Modal {
   oninit(vnode) {
@@ -29,12 +28,11 @@ export default class AttributeModal extends Modal {
   loadTaxonomy() {
       app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/ulasimarsiv-taxonomy' }).then(result => {
           this.taxonomy = result.data || [];
-          
-          // Eğer başlangıçta marka seçiliyse modelleri doldur
-          if (this.brand()) {
-              this.updateModels(this.brand());
-          }
+          console.log('[AttributeModal] Taxonomy loaded:', this.taxonomy.length, 'items');
+          if (this.brand()) this.updateModels(this.brand());
           m.redraw();
+      }).catch(err => {
+          console.error('[AttributeModal] Error loading taxonomy:', err);
       });
   }
 
@@ -45,16 +43,13 @@ export default class AttributeModal extends Modal {
       }
       const targetBrand = String(brandName).trim();
       this.availableModels = this.taxonomy.filter(item => String(item.brand).trim() === targetBrand);
+      console.log(`[AttributeModal] Filtered models for "${targetBrand}":`, this.availableModels);
       m.redraw();
   }
 
-  className() {
-    return 'AttributeModal Modal--large';
-  }
 
-  title() {
-    return 'Araç Künye Bilgileri';
-  }
+  className() { return 'AttributeModal Modal--large'; }
+  title() { return 'Araç Künye Bilgileri'; }
 
   content() {
     const brands = [...new Set(this.taxonomy.map(item => String(item.brand).trim()))].sort();
@@ -66,17 +61,19 @@ export default class AttributeModal extends Modal {
           <i>(Boş bırakılan alanlar şablonda gösterilmez)</i>
         </p>
 
+        {/* SATIR 1: Firma ve Plaka */}
         <div className="Form-group" style={{ display: 'flex', gap: '15px' }}>
             <div style={{ flex: 1 }}>
-                <label>Firma İsmi (Örn: Kamil Koç)</label>
+                <label>Firma İsmi</label>
                 <input className="FormControl" value={this.company()} oninput={e => this.company(e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-                <label>Plaka (Örn: 34 ABC 12)</label>
+                <label>Plaka</label>
                 <input className="FormControl" value={this.plate()} oninput={e => this.plate(e.target.value)} />
             </div>
         </div>
 
+        {/* SATIR 2: Marka ve Model */}
         <div className="Form-group" style={{ display: 'flex', gap: '15px' }}>
             <div style={{ flex: 1 }}>
                 <label>Marka Seçiniz</label>
@@ -103,17 +100,19 @@ export default class AttributeModal extends Modal {
             </div>
         </div>
 
+        {/* SATIR 3: Çekim Yeri ve Yıl */}
         <div className="Form-group" style={{ display: 'flex', gap: '15px', marginBottom: '30px' }}>
             <div style={{ flex: 1 }}>
-                <label>Çekim Yeri (Örn: İstanbul)</label>
+                <label>Çekim Yeri</label>
                 <input className="FormControl" value={this.location()} oninput={e => this.location(e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-                <label>Yıl (Örn: 2025)</label>
+                <label>Yıl</label>
                 <input className="FormControl" type="number" value={this.year()} oninput={e => this.year(e.target.value)} />
             </div>
         </div>
         
+        {/* BUTONLAR */}
         <div className="Form-group" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
              <Button className="Button Button--primary" style={{ backgroundColor: '#3498db', borderColor: '#3498db' }} icon="fas fa-info-circle" onclick={this.goToInfo.bind(this)}>
                 Info Ekle
