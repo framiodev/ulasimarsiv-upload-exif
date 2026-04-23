@@ -62,20 +62,20 @@ export default class AttributeModal extends Modal {
         </p>
 
         {/* SATIR 1: Firma ve Plaka */}
-        <div className="Form-group" style={{ display: 'flex', gap: '15px' }}>
-            <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
+            <div className="Form-group" style={{ flex: 1, marginBottom: 0 }}>
                 <label>Firma İsmi</label>
                 <input className="FormControl" value={this.company()} oninput={e => this.company(e.target.value)} />
             </div>
-            <div style={{ flex: 1 }}>
+            <div className="Form-group" style={{ flex: 1, marginBottom: 0 }}>
                 <label>Plaka</label>
                 <input className="FormControl" value={this.plate()} oninput={e => this.plate(e.target.value)} />
             </div>
         </div>
 
         {/* SATIR 2: Marka ve Model */}
-        <div className="Form-group" style={{ display: 'flex', gap: '15px' }}>
-            <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
+            <div className="Form-group" style={{ flex: 1, marginBottom: 0 }}>
                 <label>Marka Seçiniz</label>
                 <select className="FormControl" value={this.brand()} onchange={(e) => {
                     this.brand(e.target.value);
@@ -83,34 +83,35 @@ export default class AttributeModal extends Modal {
                     this.updateModels(e.target.value);
                 }}>
                     <option value="">-- Marka Seç --</option>
-                    {brands.map(b => <option value={b}>{b}</option>)}
+                    {brands.map(brandItem => <option value={brandItem}>{brandItem}</option>)}
                     <option value="Diğer">Diğer</option>
                 </select>
             </div>
-            <div style={{ flex: 1 }}>
+            <div className="Form-group" style={{ flex: 1, marginBottom: 0 }}>
                 <label>Model Seçiniz</label>
                 {this.brand() === 'Diğer' ? (
                     <input className="FormControl" value={this.model()} oninput={e => this.model(e.target.value)} placeholder="Modeli el ile yazın..." />
                 ) : (
                     <select className="FormControl" value={this.model()} onchange={e => this.model(e.target.value)} disabled={!this.brand()}>
                         <option value="">-- Model Seç --</option>
-                        {this.availableModels.map(m => <option value={m.model}>{m.model}</option>)}
+                        {this.availableModels.map(mod => <option value={mod.model}>{mod.model}</option>)}
                     </select>
                 )}
             </div>
         </div>
 
         {/* SATIR 3: Çekim Yeri ve Yıl */}
-        <div className="Form-group" style={{ display: 'flex', gap: '15px', marginBottom: '30px' }}>
-            <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', gap: '15px', marginBottom: '30px' }}>
+            <div className="Form-group" style={{ flex: 1, marginBottom: 0 }}>
                 <label>Çekim Yeri</label>
                 <input className="FormControl" value={this.location()} oninput={e => this.location(e.target.value)} />
             </div>
-            <div style={{ flex: 1 }}>
+            <div className="Form-group" style={{ flex: 1, marginBottom: 0 }}>
                 <label>Yıl</label>
                 <input className="FormControl" type="number" value={this.year()} oninput={e => this.year(e.target.value)} />
             </div>
         </div>
+
         
         {/* BUTONLAR */}
         <div className="Form-group" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
