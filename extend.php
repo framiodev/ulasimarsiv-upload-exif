@@ -55,10 +55,10 @@ return [
     (new Extend\Formatter)
         ->configure(function (Configurator $config) {
             $config->BBCodes->addCustom(
-                '[ulasimarsiv-image id={NUMBER} url={TEXT1} alt={TEXT2}]',
+                '[ulasimarsiv-image id={NUMBER} url={URL} alt={TEXT}]',
                 '<div class="ulasimarsiv-image-container" data-id="{NUMBER}">
                     <div class="SpotterCard-image-wrapper">
-                        <img src="{TEXT1}" alt="{TEXT2}" class="spotter-lazy" loading="lazy" />
+                        <img src="{URL}" alt="{TEXT}" class="spotter-lazy" loading="lazy" />
                     </div>
                     <div class="spotter-exif-placeholder"></div>
                  </div>'
