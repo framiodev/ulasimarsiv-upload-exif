@@ -101,13 +101,12 @@ class UploadImageController implements RequestHandlerInterface
             // İstenmeyen karakterleri sil (sadece harf, rakam, boşluk, nokta, tire ve alt çizgiye izin ver)
             $cleanName = preg_replace('/[^A-Za-z0-9\s\.\-_]/', '', $asciiName);
             
-            // Sunucu URL'lerde boşluk sevmediği için (404 hatası), hem tireleri hem de boşlukları ALT ÇİZGİYE (_) çeviriyoruz
-            $cleanName = str_replace('-', '_', $cleanName);
-            $cleanName = str_replace(' ', '_', $cleanName);
+            // Kullanıcı tire (-) işareti istemediği için aradaki tireleri BOŞLUĞA çeviriyoruz
+            $cleanName = str_replace('-', ' ', $cleanName);
             
-            // Fazladan alt çizgileri teke düşür ve kenarları temizle
-            $cleanName = preg_replace('/_+/', '_', $cleanName);
-            $cleanName = trim($cleanName, '_');
+            // Fazladan boşlukları teke düşür ve kenarları temizle
+            $cleanName = preg_replace('/\s+/', ' ', $cleanName);
+            $cleanName = trim($cleanName);
             
             // Boş isim kalırsa varsayılan
             if (empty($cleanName)) {
@@ -219,15 +218,15 @@ class UploadImageController implements RequestHandlerInterface
             $firebaseBaseUrl = self::CUSTOM_DOMAIN;
 
             $bucket->upload(fopen($localFullPath, 'r'), ['name' => $cloudFolder . $safeName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg']]);
-            $finalMainUrl = $firebaseBaseUrl . '/' . $cloudFolder . $safeName;
+            $finalMainUrl = $firebaseBaseUrl . '/' . $cloudFolder . rawurlencode($safeName);
 
             $bucket->upload(fopen($localThumbPath, 'r'), ['name' => $cloudFolder . $thumbName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg']]);
-            $finalThumbUrl = $firebaseBaseUrl . '/' . $cloudFolder . $thumbName;
+            $finalThumbUrl = $firebaseBaseUrl . '/' . $cloudFolder . rawurlencode($thumbName);
 
             $bucket->upload(fopen($localMiniPath, 'r'), ['name' => $cloudFolder . $miniName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg']]);
 
             $bucket->upload(fopen($tempBackupPath, 'r'), ['name' => $cloudFolder . $originalSafeName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg']]);
-            $finalOriginalUrl = $firebaseBaseUrl . '/' . $cloudFolder . $originalSafeName;
+            $finalOriginalUrl = $firebaseBaseUrl . '/' . $cloudFolder . rawurlencode($originalSafeName);
 
             // 9. TEMİZLİK
             @unlink($localFullPath);
