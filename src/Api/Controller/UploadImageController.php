@@ -101,19 +101,20 @@ class UploadImageController implements RequestHandlerInterface
             // İstenmeyen karakterleri sil (sadece harf, rakam, boşluk, nokta, tire ve alt çizgiye izin ver)
             $cleanName = preg_replace('/[^A-Za-z0-9\s\.\-_]/', '', $asciiName);
             
-            // Kullanıcı tire (-) işareti istemediği için aradaki tireleri BOŞLUĞA çeviriyoruz
-            $cleanName = str_replace('-', ' ', $cleanName);
+            // Kullanıcı tire (-) işareti istemediği için aradaki tireleri boşluğa çeviriyoruz
+            $cleanNameWithSpaces = str_replace('-', ' ', $cleanName);
+            $cleanNameWithSpaces = preg_replace('/\s+/', ' ', $cleanNameWithSpaces);
+            $cleanNameWithSpaces = trim($cleanNameWithSpaces);
             
-            // Fazladan boşlukları teke düşür ve kenarları temizle
-            $cleanName = preg_replace('/\s+/', ' ', $cleanName);
-            $cleanName = trim($cleanName);
-            
-            // Boş isim kalırsa varsayılan
-            if (empty($cleanName)) {
-                $cleanName = 'image';
+            if (empty($cleanNameWithSpaces)) {
+                $cleanNameWithSpaces = 'image';
             }
-
-            $originalName = $cleanName . '.' . $extension;
+            
+            // URL ve Sistem Adı: Flarum %20'yi bozduğu ve CDN boşluk sevmediği için ALT ÇİZGİ kullanmak ZORUNDAYIZ.
+            $cleanNameForUrl = str_replace(' ', '_', $cleanNameWithSpaces);
+            
+            $originalName = $cleanNameForUrl . '.' . $extension;
+            $downloadName = $cleanNameWithSpaces . '.' . $extension;
             // ------------------------------------------
 
             $safeName = time() . '_' . $originalName; 
@@ -217,16 +218,16 @@ class UploadImageController implements RequestHandlerInterface
             $cloudFolder = 'assets/ulasimarsiv/' . $subDir . '/';
             $firebaseBaseUrl = self::CUSTOM_DOMAIN;
 
-            $bucket->upload(fopen($localFullPath, 'r'), ['name' => $cloudFolder . $safeName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg']]);
-            $finalMainUrl = $firebaseBaseUrl . '/' . $cloudFolder . rawurlencode($safeName);
+            $bucket->upload(fopen($localFullPath, 'r'), ['name' => $cloudFolder . $safeName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg', 'contentDisposition' => 'inline; filename="' . $downloadName . '"']]);
+            $finalMainUrl = $firebaseBaseUrl . '/' . $cloudFolder . $safeName;
 
-            $bucket->upload(fopen($localThumbPath, 'r'), ['name' => $cloudFolder . $thumbName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg']]);
-            $finalThumbUrl = $firebaseBaseUrl . '/' . $cloudFolder . rawurlencode($thumbName);
+            $bucket->upload(fopen($localThumbPath, 'r'), ['name' => $cloudFolder . $thumbName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg', 'contentDisposition' => 'inline; filename="' . $downloadName . '"']]);
+            $finalThumbUrl = $firebaseBaseUrl . '/' . $cloudFolder . $thumbName;
 
-            $bucket->upload(fopen($localMiniPath, 'r'), ['name' => $cloudFolder . $miniName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg']]);
+            $bucket->upload(fopen($localMiniPath, 'r'), ['name' => $cloudFolder . $miniName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg', 'contentDisposition' => 'inline; filename="' . $downloadName . '"']]);
 
-            $bucket->upload(fopen($tempBackupPath, 'r'), ['name' => $cloudFolder . $originalSafeName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg']]);
-            $finalOriginalUrl = $firebaseBaseUrl . '/' . $cloudFolder . rawurlencode($originalSafeName);
+            $bucket->upload(fopen($tempBackupPath, 'r'), ['name' => $cloudFolder . $originalSafeName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg', 'contentDisposition' => 'inline; filename="' . $downloadName . '"']]);
+            $finalOriginalUrl = $firebaseBaseUrl . '/' . $cloudFolder . $originalSafeName;
 
             // 9. TEMİZLİK
             @unlink($localFullPath);
