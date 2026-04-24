@@ -37,6 +37,7 @@ export default class SpottersSettingsPage extends ExtensionPage {
     this.newBrand = '';
     this.newModel = '';
     this.newVehicleType = 'bus';
+    this.newDiscussion = '';
     this.isSavingTaxonomy = false;
   }
 
@@ -263,6 +264,15 @@ export default class SpottersSettingsPage extends ExtensionPage {
                       <option value="bus">Otobüs</option>
                       <option value="truck">Kamyon</option>
                   </select>
+                  <input 
+                      className="FormControl" 
+                      type="text" 
+                      placeholder="Konu URL (İsteğe Bağlı)" 
+                      title="Sadece belirli bir konuda gözükmesini istiyorsanız o konunun linkini buraya yapıştırın."
+                      value={this.newDiscussion}
+                      oninput={e => this.newDiscussion = e.target.value}
+                      style={{width: '200px'}}
+                  />
                   <Button 
                       className="Button Button--primary" 
                       icon="fas fa-plus" 
@@ -284,7 +294,10 @@ export default class SpottersSettingsPage extends ExtensionPage {
                           <div style={{ padding: '10px' }}>
                               {grouped[brand].map(item => (
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px', padding: '5px', borderRadius: '4px', background: '#fcfcfc', border: '1px solid #f0f0f0' }}>
-                                      <span style={{fontSize: '13px'}}>{item.model}</span>
+                                      <span style={{fontSize: '13px'}}>
+                                          {item.model}
+                                          {item.discussion_id ? <span style={{color: '#999', fontSize: '11px', marginLeft: '5px'}}>(Konu: {item.discussion_id})</span> : null}
+                                      </span>
                                       <Button className="Button Button--link Button--icon" icon="fas fa-trash-alt" onclick={() => this.deleteTaxonomy(item.id)} style={{color: '#e74c3c'}}></Button>
                                   </div>
                               ))}
@@ -457,7 +470,8 @@ export default class SpottersSettingsPage extends ExtensionPage {
           body: {
               brand: this.newBrand,
               model: this.newModel,
-              type: this.newVehicleType
+              type: this.newVehicleType,
+              discussion: this.newDiscussion
           }
       }).then(res => {
           this.newModel = ''; // Sadece modeli temizle ki aynı markaya seri ekleme kolay olsun

@@ -85,12 +85,15 @@ class UploadImageController implements RequestHandlerInterface
             $clientFilename = $file->getClientFilename();
             $extension = pathinfo($clientFilename, PATHINFO_EXTENSION);
 
+            $displayAltText = '';
             if (!empty($customFilenameInput)) {
                 // Kullanıcı özel bir ad girdiyse, boşluk ve özel karakterleri tireye çevir
-                $originalName = Str::slug(trim($customFilenameInput)) . '.' . $extension;
+                $displayAltText = trim($customFilenameInput);
+                $originalName = Str::slug($displayAltText) . '.' . $extension;
             } else {
                 // Orijinal adı da temizle (06 FUH 180.jpg -> 06-fuh-180.jpg)
                 $baseName = pathinfo($clientFilename, PATHINFO_FILENAME);
+                $displayAltText = $baseName;
                 $originalName = Str::slug($baseName) . '.' . $extension;
             }
             // ------------------------------------------
@@ -232,9 +235,7 @@ class UploadImageController implements RequestHandlerInterface
                 throw new \Exception("Veritabanı kaydı başarısız oldu.");
             }
 
-            $pathInfo = pathinfo($originalName);
-            $altText = str_replace(['-', '_'], ' ', $pathInfo['filename']);
-            $bbcode = "[ulasimarsiv-image id={$imageModel->id} url=\"{$imageModel->thumb_path}\" alt=\"{$altText}\"]";
+            $bbcode = "[ulasimarsiv-image id={$imageModel->id} url=\"{$imageModel->thumb_path}\" alt=\"{$displayAltText}\"]";
 
             return new JsonResponse([
                 'id' => $imageModel->id,

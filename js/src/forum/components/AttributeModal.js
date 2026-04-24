@@ -26,7 +26,17 @@ export default class AttributeModal extends Modal {
   }
 
   loadTaxonomy() {
-      app.request({ method: 'GET', url: app.forum.attribute('apiUrl') + '/ulasimarsiv-taxonomy' }).then(result => {
+      const discussion = app.current.get('discussion');
+      const params = {};
+      if (discussion) {
+          params.discussion_id = discussion.id();
+      }
+
+      app.request({ 
+          method: 'GET', 
+          url: app.forum.attribute('apiUrl') + '/ulasimarsiv-taxonomy',
+          params
+      }).then(result => {
           this.taxonomy = result.data || [];
           console.log('[AttributeModal] Taxonomy loaded:', this.taxonomy.length, 'items');
           if (this.brand()) this.updateModels(this.brand());

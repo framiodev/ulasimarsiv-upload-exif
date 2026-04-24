@@ -30,6 +30,17 @@ class SaveTaxonomyController implements RequestHandlerInterface
         $brand = $body['brand'] ?? '';
         $model = $body['model'] ?? '';
         $type = $body['type'] ?? 'bus';
+        $discussionInput = $body['discussion'] ?? '';
+
+        $discussionId = null;
+        if (!empty($discussionInput)) {
+            // URL parse (e.g., https://forum.ulasimarsiv.com/d/1-mercedes-benz-travego)
+            if (preg_match('/\/d\/(\d+)/', $discussionInput, $matches)) {
+                $discussionId = (int) $matches[1];
+            } elseif (is_numeric($discussionInput)) {
+                $discussionId = (int) $discussionInput;
+            }
+        }
 
         if (empty($brand) || empty($model)) {
             return new JsonResponse(['error' => 'Marka ve model boş olamaz.'], 400);
@@ -38,7 +49,8 @@ class SaveTaxonomyController implements RequestHandlerInterface
         $item = VehicleTaxonomy::create([
             'brand' => trim($brand),
             'model' => trim($model),
-            'type' => $type
+            'type' => $type,
+            'discussion_id' => $discussionId
         ]);
 
         return new JsonResponse([
