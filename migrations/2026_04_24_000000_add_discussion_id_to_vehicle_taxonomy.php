@@ -5,20 +5,16 @@ use Illuminate\Database\Schema\Builder;
 
 return [
     'up' => function (Builder $schema) {
-        if ($schema->hasTable('arsv_vehicle_taxonomy')) {
+        if ($schema->hasTable('arsv_vehicle_taxonomy') && !$schema->hasColumn('arsv_vehicle_taxonomy', 'discussion_id')) {
             $schema->table('arsv_vehicle_taxonomy', function (Blueprint $table) {
-                if (!$table->hasColumn('discussion_id')) {
-                    $table->integer('discussion_id')->nullable()->after('type');
-                }
+                $table->integer('discussion_id')->nullable()->after('type');
             });
         }
     },
     'down' => function (Builder $schema) {
-        if ($schema->hasTable('arsv_vehicle_taxonomy')) {
+        if ($schema->hasTable('arsv_vehicle_taxonomy') && $schema->hasColumn('arsv_vehicle_taxonomy', 'discussion_id')) {
             $schema->table('arsv_vehicle_taxonomy', function (Blueprint $table) {
-                if ($table->hasColumn('discussion_id')) {
-                    $table->dropColumn('discussion_id');
-                }
+                $table->dropColumn('discussion_id');
             });
         }
     }
