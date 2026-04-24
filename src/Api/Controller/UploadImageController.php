@@ -98,11 +98,11 @@ class UploadImageController implements RequestHandlerInterface
             // Türkçe karakterleri dönüştür ama harf büyüklüğünü koru (Örn: "Ş" -> "S", "ı" -> "i")
             $asciiName = Str::ascii($baseName);
             
-            // İstenmeyen karakterleri sil (sadece harf, rakam, boşluk, nokta, tire ve alt çizgiye izin ver)
+            // İstenmeyen karakterleri sil (sadece harf, rakam, boşluk, noktaye izin ver, tire ve alt çizgiyi boşluğa çevir)
             $cleanName = preg_replace('/[^A-Za-z0-9\s\.\-_]/', '', $asciiName);
             
-            // Kullanıcı tire (-) işareti istemediği için aradaki tireleri boşluğa çeviriyoruz
-            $cleanNameWithSpaces = str_replace('-', ' ', $cleanName);
+            // Kullanıcı tire (-) ve alt çizgi (_) istemediği için hepsini BOŞLUĞA çeviriyoruz
+            $cleanNameWithSpaces = str_replace(['-', '_'], ' ', $cleanName);
             $cleanNameWithSpaces = preg_replace('/\s+/', ' ', $cleanNameWithSpaces);
             $cleanNameWithSpaces = trim($cleanNameWithSpaces);
             
@@ -110,10 +110,7 @@ class UploadImageController implements RequestHandlerInterface
                 $cleanNameWithSpaces = 'image';
             }
             
-            // URL ve Sistem Adı: Flarum %20'yi bozduğu ve CDN boşluk sevmediği için ALT ÇİZGİ kullanmak ZORUNDAYIZ.
-            $cleanNameForUrl = str_replace(' ', '_', $cleanNameWithSpaces);
-            
-            $originalName = $cleanNameForUrl . '.' . $extension;
+            $originalName = $cleanNameWithSpaces . '.' . $extension;
             $downloadName = $cleanNameWithSpaces . '.' . $extension;
             // ------------------------------------------
 
@@ -219,15 +216,15 @@ class UploadImageController implements RequestHandlerInterface
             $firebaseBaseUrl = self::CUSTOM_DOMAIN;
 
             $bucket->upload(fopen($localFullPath, 'r'), ['name' => $cloudFolder . $safeName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg', 'contentDisposition' => 'inline; filename="' . $downloadName . '"']]);
-            $finalMainUrl = $firebaseBaseUrl . '/' . $cloudFolder . $safeName;
+            $finalMainUrl = $firebaseBaseUrl . '/' . $cloudFolder . rawurlencode($safeName);
 
             $bucket->upload(fopen($localThumbPath, 'r'), ['name' => $cloudFolder . $thumbName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg', 'contentDisposition' => 'inline; filename="' . $downloadName . '"']]);
-            $finalThumbUrl = $firebaseBaseUrl . '/' . $cloudFolder . $thumbName;
+            $finalThumbUrl = $firebaseBaseUrl . '/' . $cloudFolder . rawurlencode($thumbName);
 
             $bucket->upload(fopen($localMiniPath, 'r'), ['name' => $cloudFolder . $miniName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg', 'contentDisposition' => 'inline; filename="' . $downloadName . '"']]);
 
             $bucket->upload(fopen($tempBackupPath, 'r'), ['name' => $cloudFolder . $originalSafeName, 'predefinedAcl' => 'publicRead', 'metadata' => ['contentType' => 'image/jpeg', 'contentDisposition' => 'inline; filename="' . $downloadName . '"']]);
-            $finalOriginalUrl = $firebaseBaseUrl . '/' . $cloudFolder . $originalSafeName;
+            $finalOriginalUrl = $firebaseBaseUrl . '/' . $cloudFolder . rawurlencode($originalSafeName);
 
             // 9. TEMİZLİK
             @unlink($localFullPath);
