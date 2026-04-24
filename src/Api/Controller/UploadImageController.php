@@ -87,15 +87,33 @@ class UploadImageController implements RequestHandlerInterface
 
             $displayAltText = '';
             if (!empty($customFilenameInput)) {
-                // Kullanıcı özel bir ad girdiyse, boşluk ve özel karakterleri tireye çevir
-                $displayAltText = trim($customFilenameInput);
-                $originalName = Str::slug($displayAltText) . '.' . $extension;
+                // Kullanıcı özel bir ad girdiyse onu kullan
+                $baseName = trim($customFilenameInput);
             } else {
-                // Orijinal adı da temizle (06 FUH 180.jpg -> 06-fuh-180.jpg)
+                // Orijinal adı kullan
                 $baseName = pathinfo($clientFilename, PATHINFO_FILENAME);
-                $displayAltText = $baseName;
-                $originalName = Str::slug($baseName) . '.' . $extension;
             }
+            $displayAltText = $baseName;
+            
+            // Türkçe karakterleri dönüştür ama harf büyüklüğünü koru (Örn: "Ş" -> "S", "ı" -> "i")
+            $asciiName = Str::ascii($baseName);
+            
+            // İstenmeyen karakterleri sil (sadece harf, rakam, boşluk, nokta ve alt çizgiye izin ver)
+            $cleanName = preg_replace('/[^A-Za-z0-9\s\._]/', '', $asciiName);
+            
+            // Kullanıcı tire (-) işareti istemediği için aradaki tireleri boşluğa çevir
+            $cleanName = str_replace('-', ' ', $cleanName);
+            
+            // Fazladan boşlukları tek boşluğa düşür ve kenarları temizle
+            $cleanName = preg_replace('/\s+/', ' ', $cleanName);
+            $cleanName = trim($cleanName);
+            
+            // Boş isim kalırsa varsayılan
+            if (empty($cleanName)) {
+                $cleanName = 'image';
+            }
+
+            $originalName = $cleanName . '.' . $extension;
             // ------------------------------------------
 
             $safeName = time() . '_' . $originalName; 
