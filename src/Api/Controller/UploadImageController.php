@@ -98,15 +98,16 @@ class UploadImageController implements RequestHandlerInterface
             // Türkçe karakterleri dönüştür ama harf büyüklüğünü koru (Örn: "Ş" -> "S", "ı" -> "i")
             $asciiName = Str::ascii($baseName);
             
-            // İstenmeyen karakterleri sil (sadece harf, rakam, boşluk, nokta ve alt çizgiye izin ver)
-            $cleanName = preg_replace('/[^A-Za-z0-9\s\._]/', '', $asciiName);
+            // İstenmeyen karakterleri sil (sadece harf, rakam, boşluk, nokta, tire ve alt çizgiye izin ver)
+            $cleanName = preg_replace('/[^A-Za-z0-9\s\.\-_]/', '', $asciiName);
             
-            // Kullanıcı tire (-) işareti istemediği için aradaki tireleri boşluğa çevir
-            $cleanName = str_replace('-', ' ', $cleanName);
+            // Sunucu URL'lerde boşluk sevmediği için (404 hatası), hem tireleri hem de boşlukları ALT ÇİZGİYE (_) çeviriyoruz
+            $cleanName = str_replace('-', '_', $cleanName);
+            $cleanName = str_replace(' ', '_', $cleanName);
             
-            // Fazladan boşlukları tek boşluğa düşür ve kenarları temizle
-            $cleanName = preg_replace('/\s+/', ' ', $cleanName);
-            $cleanName = trim($cleanName);
+            // Fazladan alt çizgileri teke düşür ve kenarları temizle
+            $cleanName = preg_replace('/_+/', '_', $cleanName);
+            $cleanName = trim($cleanName, '_');
             
             // Boş isim kalırsa varsayılan
             if (empty($cleanName)) {
