@@ -101,7 +101,7 @@ class UploadImageController implements RequestHandlerInterface
             // İstenmeyen karakterleri sil (sadece harf, rakam, boşluk, noktaye izin ver, tire ve alt çizgiyi boşluğa çevir)
             $cleanName = preg_replace('/[^A-Za-z0-9\s\.\-_]/', '', $asciiName);
             
-            // Kullanıcı tire (-) ve alt çizgi (_) istemediği için hepsini BOŞLUĞA çeviriyoruz
+            // Kullanıcı tire ve alt çizgi istemediği için asıl ismi BOŞLUĞA çeviriyoruz
             $cleanNameWithSpaces = str_replace(['-', '_'], ' ', $cleanName);
             $cleanNameWithSpaces = preg_replace('/\s+/', ' ', $cleanNameWithSpaces);
             $cleanNameWithSpaces = trim($cleanNameWithSpaces);
@@ -110,11 +110,18 @@ class UploadImageController implements RequestHandlerInterface
                 $cleanNameWithSpaces = 'image';
             }
             
+            // FIREBASE HOSTING URL'DE BOŞLUK (%20) KABUL ETMEDİĞİ İÇİN URL İÇİN TİRELİ VERSİYON OLUŞTURUYORUZ
+            $urlSafeName = str_replace(' ', '-', $cleanNameWithSpaces);
+            
+            // Veritabanı ve ALT etiketinde kullanılacak GÜZEL (boşluklu) hali
             $originalName = $cleanNameWithSpaces . '.' . $extension;
+            // İndirilirken bilgisayara kaydedilecek GÜZEL (boşluklu) hali
             $downloadName = $cleanNameWithSpaces . '.' . $extension;
+            // URL'lerde kullanılacak Benzersiz isim (Tireli olmak ZORUNDA)
+            $urlFilename = $urlSafeName . '.' . $extension;
             // ------------------------------------------
 
-            $safeName = time() . '_' . $originalName; 
+            $safeName = time() . '_' . $urlFilename; 
             $localFullPath = "$this->uploadPath/$safeName";
             
             // 3. KAYDET
